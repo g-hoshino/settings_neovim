@@ -40,7 +40,9 @@ return {
     },
     config = function()
       local ok, copilot_cmp = pcall(require, "copilot_cmp")
-      if not ok then return end
+      if not ok then
+        return
+      end
 
       copilot_cmp.setup({
         formatters = {
@@ -115,7 +117,9 @@ return {
     build = "make install_jsregexp",
     config = function()
       local ok, loader = pcall(require, "luasnip.loaders.from_vscode")
-      if not ok then return end
+      if not ok then
+        return
+      end
       loader.lazy_load()
     end,
   },
@@ -138,7 +142,6 @@ return {
   ------------------------------------------------------------
   {
     "mason-org/mason.nvim",
-    lazy = false,
     cmd = {
       "Mason",
       "MasonUpdate",
@@ -156,7 +159,6 @@ return {
   ------------------------------------------------------------
   {
     "mason-org/mason-lspconfig.nvim",
-    lazy = false,
     event = { "BufReadPre", "BufNewFile" },
     dependencies = {
       "mason-org/mason.nvim",
@@ -210,7 +212,9 @@ return {
     },
     config = function()
       local ok, noice = pcall(require, "noice")
-      if not ok then return end
+      if not ok then
+        return
+      end
 
       noice.setup({
         lsp = {
@@ -381,60 +385,53 @@ return {
 
   ------------------------------------------------------------
   -- nvim-treesitter: 構文解析 / 高精度ハイライト
-  -- 起動時に読み込むが、parser 自動 install は止める
-  -- ファイルを開いたときに vim.treesitter.start() を明示的に呼ぶ
+  --
+  -- Neovim 0.13 では Markdown の Treesitter highlighter で
+  -- "attempt to call method 'range' (a nil value)" が出る場合があるため,
+  -- Markdown では Treesitter を完全に起動しない.
+  --
+  -- Markdown は Vim 標準 syntax highlight を使う.
+  ------------------------------------------------------------
+  ---
+  ------------------------------------------------------------
+  -- nvim-treesitter: 構文解析 / 高精度ハイライト
+  --
+  -- Neovim 0.13 + nvim-treesitter main branch 用.
+  -- Markdown も Treesitter highlight を使う.
   ------------------------------------------------------------
   {
     "nvim-treesitter/nvim-treesitter",
-    lazy = false,
-
-    init = function()
-      local group = vim.api.nvim_create_augroup("ForceTreesitterStart", { clear = true })
-
-      vim.api.nvim_create_autocmd({ "BufReadPost", "BufNewFile", "FileType", "BufEnter" }, {
-        group = group,
-        pattern = "*",
-        callback = function(args)
-          local bufnr = args.buf
-          local ft = vim.bo[bufnr].filetype
-
-          if ft == "" then
-            return
-          end
-
-          local disabled = {
-            help = true,
-            lazy = true,
-            mason = true,
-            ["neo-tree"] = true,
-            oil = true,
-            toggleterm = true,
-            terminal = true,
-            prompt = true,
-            noice = true,
-            notify = true,
-          }
-
-          if disabled[ft] then
-            return
-          end
-
-          local ok_lang, lang = pcall(vim.treesitter.language.get_lang, ft)
-          if not ok_lang or not lang then
-            return
-          end
-
-          pcall(vim.treesitter.start, bufnr, lang)
-        end,
-      })
-    end,
+    branch = "main",
+    event = { "BufReadPre", "BufNewFile" },
 
     config = function()
-      local ok, configs = pcall(require, "nvim-treesitter.configs")
-      if not ok then return end
+      local ok, ts = pcall(require, "nvim-treesitter")
+      if not ok then
+        return
+      end
 
-      configs.setup({
-        ensure_installed = {
+      ts.setup({
+        install_dir = vim.fn.stdpath("data") .. "/site",
+      })
+
+      local parsers = {
+        "lua",
+        "vim",
+        "vimdoc",
+        "python",
+        "bash",
+        "json",
+        "yaml",
+        "regex",
+        "markdown",
+        "markdown_inline",
+      }
+
+      pcall(ts.install, parsers)
+
+      vim.api.nvim_create_autocmd("FileType", {
+        group = vim.api.nvim_create_augroup("StartTreesitterForFiletypes", { clear = true }),
+        pattern = {
           "lua",
           "vim",
           "vimdoc",
@@ -442,23 +439,31 @@ return {
           "bash",
           "json",
           "yaml",
+          "markdown",
+          "mdx",
         },
-        auto_install = false,
-        sync_install = false,
-        highlight = {
-          enable = true,
-          additional_vim_regex_highlighting = false,
+        callback = function(args)
+          pcall(vim.treesitter.start, args.buf)
+        end,
+      })
+
+      -- Markdown の indent は不安定になりやすいので無効化.
+      vim.api.nvim_create_autocmd("FileType", {
+        group = vim.api.nvim_create_augroup("DisableMarkdownTreesitterIndent", { clear = true }),
+        pattern = {
+          "markdown",
+          "mdx",
         },
-        indent = {
-          enable = true,
-        },
+        callback = function(args)
+          vim.bo[args.buf].indentexpr = ""
+        end,
       })
     end,
   },
 
   ------------------------------------------------------------
   -- indent-blankline.nvim: インデントガイド表示
-  -- ファイルを開いた後に読み込む
+  -- Markdown では Treesitter scope を使わせない
   ------------------------------------------------------------
   {
     "lukas-reineke/indent-blankline.nvim",
@@ -466,10 +471,14 @@ return {
     event = { "BufReadPost", "BufNewFile" },
     config = function()
       local ok_ibl, ibl = pcall(require, "ibl")
-      if not ok_ibl then return end
+      if not ok_ibl then
+        return
+      end
 
       local ok_hooks, hooks = pcall(require, "ibl.hooks")
-      if not ok_hooks then return end
+      if not ok_hooks then
+        return
+      end
 
       local rainbow = {
         "RainbowRed",
@@ -482,24 +491,45 @@ return {
       }
 
       hooks.register(hooks.type.HIGHLIGHT_SETUP, function()
-        vim.api.nvim_set_hl(0, "RainbowRed",    { fg = "#f7768e" })
+        vim.api.nvim_set_hl(0, "RainbowRed", { fg = "#f7768e" })
         vim.api.nvim_set_hl(0, "RainbowYellow", { fg = "#e0af68" })
-        vim.api.nvim_set_hl(0, "RainbowBlue",   { fg = "#7aa2f7" })
+        vim.api.nvim_set_hl(0, "RainbowBlue", { fg = "#7aa2f7" })
         vim.api.nvim_set_hl(0, "RainbowOrange", { fg = "#ff9e64" })
-        vim.api.nvim_set_hl(0, "RainbowGreen",  { fg = "#9ece6a" })
+        vim.api.nvim_set_hl(0, "RainbowGreen", { fg = "#9ece6a" })
         vim.api.nvim_set_hl(0, "RainbowViolet", { fg = "#bb9af7" })
-        vim.api.nvim_set_hl(0, "RainbowCyan",   { fg = "#7dcfff" })
-        vim.api.nvim_set_hl(0, "IblIndent",     { link = "LineNr" })
-        vim.api.nvim_set_hl(0, "IblScope",      { fg = "#c0caf5", bold = true, nocombine = true })
+        vim.api.nvim_set_hl(0, "RainbowCyan", { fg = "#7dcfff" })
+        vim.api.nvim_set_hl(0, "IblIndent", { link = "LineNr" })
+        vim.api.nvim_set_hl(0, "IblScope", { fg = "#c0caf5", bold = true, nocombine = true })
       end)
 
       hooks.register(hooks.type.SCOPE_HIGHLIGHT, hooks.builtin.scope_highlight_from_extmark)
 
       ibl.setup({
+        enabled = true,
+
+        exclude = {
+          filetypes = {
+            "help",
+            "lazy",
+            "mason",
+            "neo-tree",
+            "oil",
+            "toggleterm",
+            "terminal",
+            "prompt",
+            "noice",
+            "notify",
+            "markdown",
+            "markdown.mdx",
+            "mdx",
+          },
+        },
+
         indent = {
           char = "│",
           highlight = rainbow,
         },
+
         scope = {
           enabled = true,
           show_exact_scope = true,
@@ -508,6 +538,7 @@ return {
           show_start = false,
           show_end = false,
         },
+
         whitespace = {
           remove_blankline_trail = true,
         },
@@ -659,8 +690,7 @@ return {
         desc = "Toggle Flash Search",
       },
 
-      -- Treesitter search は重くなりやすいので一旦無効化
-      -- 必要なら Treesitter が安定してから戻す
+      -- Treesitter search は Neovim 0.13 の Markdown 問題が安定するまで無効化
       -- {
       --   "S",
       --   mode = { "n", "x", "o" },
