@@ -5,7 +5,7 @@ require("config.lazy")
 
 -- Basic settings
 require("config.options")
-require("config.clipboard")
 require("config.providers")
 require("config.keymaps")
 require("config.highlights")
+require("config.llm")
