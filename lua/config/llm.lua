@@ -50,10 +50,10 @@ local function get_terminal(name, command)
     terminals[key] = Terminal:new({
       cmd = command,
       dir = cwd,
-      direction = "vertical",
-      size = function()
-        return math.floor(vim.o.columns * 0.5)
-      end,
+      -- The generic ToggleTerm uses a right-aligned floating window.
+      -- Keep the LLM terminals on exactly the same layout and dimensions
+      -- by inheriting toggleterm.nvim's global float_opts.
+      direction = "float",
       hidden = true,
       close_on_exit = false,
       start_in_insert = true,
