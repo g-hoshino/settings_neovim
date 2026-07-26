@@ -52,7 +52,7 @@ local function get_terminal(name, command)
       dir = cwd,
       direction = "vertical",
       size = function()
-        return math.max(50, math.floor(vim.o.columns * 0.42))
+        return math.floor(vim.o.columns * 0.5)
       end,
       hidden = true,
       close_on_exit = false,
