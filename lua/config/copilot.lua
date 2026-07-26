@@ -1,20 +1,20 @@
 local ok, copilot = pcall(require, "copilot")
-if not ok then return end
+if not ok then
+  return
+end
 
 copilot.setup({
-  panel = { enabled = false },        -- パネルは重いので無効のまま
+  panel = { enabled = false },
   suggestion = {
     enabled = true,
-    auto_trigger = false,             -- 入力なしでは提案を出さない（従来どおり）
+    auto_trigger = false,
     debounce = 120,
-    keymap = { accept = false },      -- <Tab> 確定は cmp 側で
+    keymap = { accept = false },
   },
 
-  -- すべてのファイルタイプで許可（個別で止めない）
-  filetypes = { ["*"] = true },
-
-  -- 常にアタッチ（自動停止しない）
-  should_attach = function(_) return true end,
+  should_attach = function()
+    return true
+  end,
 
   server_opts_overrides = {
     settings = {
@@ -26,6 +26,7 @@ copilot.setup({
   },
 
   filetypes = {
+    ["*"] = true,
     help = false,
     text = false,
     yaml = false,
@@ -35,15 +36,13 @@ copilot.setup({
   },
 })
 
-pcall(function()
-  require("copilot_cmp").setup()
-end)
-
--- cmp メニューが開いたときは Copilot ゴーストを隠す（誤確定防止）
+-- cmp メニューが開いたときは Copilot のゴースト表示を隠す．
 pcall(function()
   local cmp = require("cmp")
   local suggestion = require("copilot.suggestion")
   cmp.event:on("menu_opened", function()
-    if suggestion.is_visible() then suggestion.dismiss() end
+    if suggestion.is_visible() then
+      suggestion.dismiss()
+    end
   end)
 end)
