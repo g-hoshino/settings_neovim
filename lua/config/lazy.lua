@@ -86,6 +86,17 @@ for _, spec in ipairs(plugins) do
   end
 end
 
+-- VimTeXの設定値はfiletype plugin読み込み前に定義する必要があるため，
+-- plugins.luaの既存initをmacOS対応設定へ置き換える．
+for _, spec in ipairs(plugins) do
+  if type(spec) == "table" and spec[1] == "lervag/vimtex" then
+    spec.init = function()
+      require("config.vimtex").setup()
+    end
+    break
+  end
+end
+
 require("lazy").setup(plugins, {
   rocks = {
     enabled = false,
