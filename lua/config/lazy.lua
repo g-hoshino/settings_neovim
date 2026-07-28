@@ -26,15 +26,19 @@ vim.g.maplocalleader = "\\"
 
 local plugins = require("plugins")
 
--- nvim-treesitter main は遅延ロード非対応．
--- plugins.lua の既存 spec を直接上書きし，重複定義を作らない．
+-- 現行 nvim-treesitter は別organizationへ移行し，parser registryを使用する．
+-- 遅延ロードには対応しないため，既存specを起動前に直接上書きする．
 for _, spec in ipairs(plugins) do
   if type(spec) == "table" and spec[1] == "nvim-treesitter/nvim-treesitter" then
+    spec[1] = "neovim-treesitter/nvim-treesitter"
     spec.branch = "main"
     spec.lazy = false
     spec.event = nil
     spec.cmd = nil
     spec.build = ":TSUpdate"
+    spec.dependencies = {
+      "neovim-treesitter/treesitter-parser-registry",
+    }
 
     spec.config = function()
       local ok, ts = pcall(require, "nvim-treesitter")
