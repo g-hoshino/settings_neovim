@@ -26,54 +26,61 @@ vim.g.maplocalleader = "\\"
 
 local plugins = require("plugins")
 
--- nvim-treesitter の main ブランチは遅延ロード非対応．
--- 既存 spec を上書きし，起動時にコマンドを登録する．
-table.insert(plugins, {
-  "nvim-treesitter/nvim-treesitter",
-  branch = "main",
-  lazy = false,
-  build = ":TSUpdate",
-  config = function()
-    local ok, ts = pcall(require, "nvim-treesitter")
-    if not ok then
-      return
+-- nvim-treesitter main は遅延ロード非対応．
+-- plugins.lua の既存 spec を直接上書きし，重複定義を作らない．
+for _, spec in ipairs(plugins) do
+  if type(spec) == "table" and spec[1] == "nvim-treesitter/nvim-treesitter" then
+    spec.branch = "main"
+    spec.lazy = false
+    spec.event = nil
+    spec.cmd = nil
+    spec.build = ":TSUpdate"
+
+    spec.config = function()
+      local ok, ts = pcall(require, "nvim-treesitter")
+      if not ok then
+        vim.notify("nvim-treesitter could not be loaded", vim.log.levels.ERROR)
+        return
+      end
+
+      ts.setup({
+        install_dir = vim.fn.stdpath("data") .. "/site",
+      })
+
+      vim.api.nvim_create_autocmd("FileType", {
+        group = vim.api.nvim_create_augroup("StartTreesitterForFiletypes", { clear = true }),
+        pattern = {
+          "lua",
+          "vim",
+          "vimdoc",
+          "python",
+          "bash",
+          "json",
+          "yaml",
+          "markdown",
+          "mdx",
+        },
+        callback = function(args)
+          pcall(vim.treesitter.start, args.buf)
+        end,
+      })
+
+      -- Markdown の indent は不安定になりやすいので無効化．
+      vim.api.nvim_create_autocmd("FileType", {
+        group = vim.api.nvim_create_augroup("DisableMarkdownTreesitterIndent", { clear = true }),
+        pattern = {
+          "markdown",
+          "mdx",
+        },
+        callback = function(args)
+          vim.bo[args.buf].indentexpr = ""
+        end,
+      })
     end
 
-    ts.setup({
-      install_dir = vim.fn.stdpath("data") .. "/site",
-    })
-
-    vim.api.nvim_create_autocmd("FileType", {
-      group = vim.api.nvim_create_augroup("StartTreesitterForFiletypes", { clear = true }),
-      pattern = {
-        "lua",
-        "vim",
-        "vimdoc",
-        "python",
-        "bash",
-        "json",
-        "yaml",
-        "markdown",
-        "mdx",
-      },
-      callback = function(args)
-        pcall(vim.treesitter.start, args.buf)
-      end,
-    })
-
-    -- Markdown の indent は不安定になりやすいので無効化．
-    vim.api.nvim_create_autocmd("FileType", {
-      group = vim.api.nvim_create_augroup("DisableMarkdownTreesitterIndent", { clear = true }),
-      pattern = {
-        "markdown",
-        "mdx",
-      },
-      callback = function(args)
-        vim.bo[args.buf].indentexpr = ""
-      end,
-    })
-  end,
-})
+    break
+  end
+end
 
 require("lazy").setup(plugins, {
   rocks = {
