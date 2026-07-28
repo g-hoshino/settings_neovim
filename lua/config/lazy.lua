@@ -24,7 +24,58 @@ vim.opt.rtp:prepend(lazypath)
 vim.g.mapleader = " "
 vim.g.maplocalleader = "\\"
 
-require("lazy").setup("plugins", {
+local plugins = require("plugins")
+
+-- nvim-treesitter の main ブランチは遅延ロード非対応．
+-- 既存 spec を上書きし，起動時にコマンドを登録する．
+table.insert(plugins, {
+  "nvim-treesitter/nvim-treesitter",
+  branch = "main",
+  lazy = false,
+  build = ":TSUpdate",
+  config = function()
+    local ok, ts = pcall(require, "nvim-treesitter")
+    if not ok then
+      return
+    end
+
+    ts.setup({
+      install_dir = vim.fn.stdpath("data") .. "/site",
+    })
+
+    vim.api.nvim_create_autocmd("FileType", {
+      group = vim.api.nvim_create_augroup("StartTreesitterForFiletypes", { clear = true }),
+      pattern = {
+        "lua",
+        "vim",
+        "vimdoc",
+        "python",
+        "bash",
+        "json",
+        "yaml",
+        "markdown",
+        "mdx",
+      },
+      callback = function(args)
+        pcall(vim.treesitter.start, args.buf)
+      end,
+    })
+
+    -- Markdown の indent は不安定になりやすいので無効化．
+    vim.api.nvim_create_autocmd("FileType", {
+      group = vim.api.nvim_create_augroup("DisableMarkdownTreesitterIndent", { clear = true }),
+      pattern = {
+        "markdown",
+        "mdx",
+      },
+      callback = function(args)
+        vim.bo[args.buf].indentexpr = ""
+      end,
+    })
+  end,
+})
+
+require("lazy").setup(plugins, {
   rocks = {
     enabled = false,
   },
