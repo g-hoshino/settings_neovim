@@ -59,10 +59,10 @@ cmp.setup({
 
   sources = cmp.config.sources({
     { name = "copilot",  group_index = 1, priority = 100, keyword_length = 0 },
-    { name = "nvim_lsp", group_index = 2, priority = 90 },
-    { name = "path",     group_index = 2, priority = 80 },
-    { name = "luasnip",  group_index = 3, priority = 70 },
-    { name = "buffer",   group_index = 4, priority = 50, keyword_length = 3 },
+    { name = "nvim_lsp", group_index = 2, priority = 100 },
+    { name = "path",     group_index = 2, priority = 100 },
+    { name = "luasnip",  group_index = 3, priority = 100 },
+    { name = "buffer",   group_index = 4, priority = 100, keyword_length = 3 },
   }),
 
   experimental = {

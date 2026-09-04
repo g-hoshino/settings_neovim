@@ -1,208 +1,44 @@
-local function cfg(name)
+local function load_config(name)
   return function()
     require(name)
   end
 end
 
 return {
+  -- ==========================================================================
 
-  ------------------------------------------------------------
-  -- Git UI: lazygit を Neovim から開く
-  ------------------------------------------------------------
+  -- UI・外観
+
+  -- ==========================================================================
+
+  -- Tokyo Night Moonカラースキームを適用する．
   {
-    "kdheepak/lazygit.nvim",
-    cmd = "LazyGit",
-    dependencies = {
-      "nvim-lua/plenary.nvim",
-    },
-  },
-
-  ------------------------------------------------------------
-  -- GitHub Copilot: AI 補完本体
-  -- 重いので InsertEnter まで読み込まない
-  ------------------------------------------------------------
-  {
-    "zbirenbaum/copilot.lua",
-    event = "InsertEnter",
-    config = cfg("config.copilot"),
-  },
-
-  ------------------------------------------------------------
-  -- Copilot completion source for nvim-cmp
-  -- Copilot と nvim-cmp の橋渡し
-  ------------------------------------------------------------
-  {
-    "zbirenbaum/copilot-cmp",
-    event = "InsertEnter",
-    dependencies = {
-      "zbirenbaum/copilot.lua",
-      "hrsh7th/nvim-cmp",
-    },
-    config = function()
-      local ok, copilot_cmp = pcall(require, "copilot_cmp")
-      if not ok then
-        return
-      end
-
-      copilot_cmp.setup({
-        formatters = {
-          insert_text = require("copilot_cmp.format").remove_existing,
-        },
-      })
-    end,
-  },
-
-  ------------------------------------------------------------
-  -- CopilotChat: Copilot とのチャット UI
-  -- :CopilotChat を実行したときだけ読み込む
-  ------------------------------------------------------------
-  {
-    "CopilotC-Nvim/CopilotChat.nvim",
-    branch = "main",
-    cmd = "CopilotChat",
-    dependencies = {
-      "zbirenbaum/copilot.lua",
-      "nvim-lua/plenary.nvim",
-    },
+    "folke/tokyonight.nvim",
+    lazy = false,
+    priority = 1000,
     opts = {
-      window = {
-        layout = "vertical",
-        width = 0.40,
-      },
-      auto_insert_mode = true,
+      transparent = true,
+      on_highlights = function(highlights)
+        highlights.Comment = {
+          fg = "#8FAFC2",
+          ctermfg = "LightBlue",
+        }
+      end,
     },
     config = function(_, opts)
-      vim.opt.splitright = true
-      vim.opt.splitbelow = true
-      require("CopilotChat").setup(opts)
-    end,
-    keys = {
-      {
-        "C",
-        function()
-          require("CopilotChat").toggle()
-        end,
-        desc = "CopilotChat: Toggle",
-        mode = { "n" },
-      },
-    },
-  },
-
-  ------------------------------------------------------------
-  -- nvim-cmp: 補完エンジン
-  -- InsertEnter まで読み込まない
-  ------------------------------------------------------------
-  {
-    "hrsh7th/nvim-cmp",
-    event = "InsertEnter",
-    dependencies = {
-      "zbirenbaum/copilot-cmp",
-      "hrsh7th/cmp-nvim-lsp",
-      "hrsh7th/cmp-buffer",
-      "hrsh7th/cmp-path",
-      "onsails/lspkind-nvim",
-      "saadparwaiz1/cmp_luasnip",
-      "L3MON4D3/LuaSnip",
-    },
-    config = cfg("config.cmp"),
-  },
-
-  ------------------------------------------------------------
-  -- LuaSnip: snippet engine
-  -- 補完開始時まで読み込まない
-  ------------------------------------------------------------
-  {
-    "L3MON4D3/LuaSnip",
-    event = "InsertEnter",
-    build = "make install_jsregexp",
-    config = function()
-      local ok, loader = pcall(require, "luasnip.loaders.from_vscode")
-      if not ok then
-        return
-      end
-      loader.lazy_load()
+      require("tokyonight").setup(opts)
+      vim.cmd.colorscheme("tokyonight-moon")
     end,
   },
 
-  ------------------------------------------------------------
-  -- cmp-cmdline: コマンドライン補完
-  ------------------------------------------------------------
-  {
-    "hrsh7th/cmp-cmdline",
-    event = "CmdlineEnter",
-    dependencies = {
-      "hrsh7th/nvim-cmp",
-    },
-  },
-
-  ------------------------------------------------------------
-  -- Mason: LSP / formatter / linter の管理 UI
-  -- 起動時には読み込まず、:Mason 実行時のみ読み込む
-  -- :MasonUpdate は手動で実行する
-  ------------------------------------------------------------
-  {
-    "mason-org/mason.nvim",
-    cmd = {
-      "Mason",
-      "MasonUpdate",
-      "MasonLog",
-      "MasonInstall",
-      "MasonUninstall",
-      "MasonUninstallAll",
-    },
-    opts = {},
-  },
-
-  ------------------------------------------------------------
-  -- mason-lspconfig: Mason と nvim-lspconfig の連携
-  -- ファイルを開く直前に読み込む
-  ------------------------------------------------------------
-  {
-    "mason-org/mason-lspconfig.nvim",
-    event = { "BufReadPre", "BufNewFile" },
-    dependencies = {
-      "mason-org/mason.nvim",
-      "neovim/nvim-lspconfig",
-    },
-    opts = {},
-  },
-
-  ------------------------------------------------------------
-  -- nvim-lspconfig: LSP 設定本体
-  -- Python / Lua / YAML / Fortran などの LSP を設定
-  ------------------------------------------------------------
-  {
-    "neovim/nvim-lspconfig",
-    event = { "BufReadPre", "BufNewFile" },
-    dependencies = {
-      "mason-org/mason.nvim",
-      "mason-org/mason-lspconfig.nvim",
-      "hrsh7th/cmp-nvim-lsp",
-    },
-    config = cfg("config.lsp"),
-  },
-
-  ------------------------------------------------------------
-  -- fidget.nvim: LSP の進捗表示
-  -- LSP attach 後に読み込む
-  ------------------------------------------------------------
-  {
-    "j-hui/fidget.nvim",
-    event = "LspAttach",
-    opts = {},
-  },
-
-  ------------------------------------------------------------
-  -- noice.nvim: command line / LSP hover / notify UI の拡張
-  -- やや重いので VeryLazy で読み込む
-  ------------------------------------------------------------
+  -- コマンドライン，通知，LSPドキュメントの表示UIを拡張する．
   {
     "folke/noice.nvim",
     event = "VeryLazy",
     dependencies = {
-      "nvim-lua/plenary.nvim",
-      "MunifTanjim/nui.nvim",
+      "MunifTanjim/nui.nvim", -- ポップアップなどのUI部品．
       {
+        -- vim.notifyの通知を画面右上などへ表示する．
         "rcarriga/nvim-notify",
         opts = {
           stages = "fade_in_slide_out",
@@ -210,276 +46,54 @@ return {
         },
       },
     },
-    config = function()
-      local ok, noice = pcall(require, "noice")
-      if not ok then
-        return
-      end
-
-      noice.setup({
-        lsp = {
-          hover = { enabled = true },
-          signature = {
-            enabled = true,
-            auto_open = {
-              enabled = true,
-              trigger = true,
-              luasnip = true,
-            },
-          },
-          progress = { enabled = true },
-          override = {
-            ["vim.lsp.util.convert_input_to_markdown_lines"] = true,
-            ["vim.lsp.util.stylize_markdown"] = true,
-            ["cmp.entry.get_documentation"] = true,
+    opts = {
+      lsp = {
+        override = {
+          ["vim.lsp.util.convert_input_to_markdown_lines"] = true,
+          ["vim.lsp.util.stylize_markdown"] = true,
+          ["cmp.entry.get_documentation"] = true,
+        },
+      },
+      presets = {
+        command_palette = true,
+        long_message_to_split = true,
+        lsp_doc_border = true,
+      },
+      views = {
+        cmdline_popup = {
+          position = {
+            row = 10,
+            col = "50%",
           },
         },
-        presets = {
-          bottom_search = false,
-          command_palette = true,
-          long_message_to_split = true,
-          lsp_doc_border = true,
-        },
-        views = {
-          cmdline_popup = {
-            position = {
-              row = 10,
-              col = "50%",
-            },
+      },
+      routes = {
+        {
+          filter = {
+            event = "notify",
+            find = "deprecated",
           },
+          opts = { skip = true },
         },
-        routes = {
-          {
-            filter = {
-              event = "notify",
-              find = "deprecated",
-            },
-            opts = {
-              skip = true,
-            },
-          },
-        },
-      })
-    end,
+      },
+    },
   },
 
-  ------------------------------------------------------------
-  -- lualine.nvim: ステータスライン
-  -- UI 系なので VeryLazy で読み込む
-  ------------------------------------------------------------
+  -- モード，Git，LSPなどの状態を画面下部に表示するステータスライン．
   {
     "nvim-lualine/lualine.nvim",
     event = "VeryLazy",
-    dependencies = {
-      "nvim-tree/nvim-web-devicons",
-    },
-    opts = {
-      icons_enabled = true,
-      theme = "auto",
-    },
-    config = cfg("config.lualine"),
+    dependencies = { "nvim-tree/nvim-web-devicons" }, -- ファイル種別アイコン．
+    config = load_config("config.lualine"),
   },
 
-  ------------------------------------------------------------
-  -- telescope.nvim: ファイル検索 / grep UI
-  -- コマンドまたはキー入力時だけ読み込む
-  ------------------------------------------------------------
-  {
-    "nvim-telescope/telescope.nvim",
-    cmd = "Telescope",
-    keys = {
-      {
-        "<leader>tf",
-        function()
-          require("telescope.builtin").find_files()
-        end,
-        desc = "Find files",
-      },
-      {
-        "<leader>tg",
-        function()
-          require("telescope.builtin").live_grep()
-        end,
-        desc = "Live grep",
-      },
-      {
-        "<C-t>",
-        "<cmd>Telescope<CR>",
-        mode = "n",
-        desc = "Open Telescope",
-      },
-    },
-    dependencies = {
-      "nvim-lua/plenary.nvim",
-    },
-  },
-
-  ------------------------------------------------------------
-  -- neo-tree.nvim: ファイルツリー
-  -- :Neotree 実行時だけ読み込む
-  ------------------------------------------------------------
-  {
-    "nvim-neo-tree/neo-tree.nvim",
-    branch = "v3.x",
-    cmd = "Neotree",
-    dependencies = {
-      "nvim-lua/plenary.nvim",
-      "nvim-tree/nvim-web-devicons",
-      "MunifTanjim/nui.nvim",
-    },
-    opts = {
-      filesystem = {
-        use_libuv_file_watcher = false,
-        scan_mode = "shallow",
-        async_directory_scan = "always",
-        bind_to_cwd = true,
-        follow_current_file = {
-          enabled = true,
-          leave_dirs_open = false,
-        },
-        filtered_items = {
-          visible = false,
-          hide_dotfiles = false,
-          hide_gitignored = false,
-        },
-        window = {
-          position = "left",
-          width = 30,
-          mappings = {
-            ["<C-k>"] = "navigate_up",
-            ["<C-j>"] = "open",
-          },
-        },
-      },
-    },
-  },
-
-  ------------------------------------------------------------
-  -- oil.nvim: ディレクトリをバッファとして編集する file manager
-  -- キーまたは :Oil 実行時のみ読み込む
-  ------------------------------------------------------------
-  {
-    "stevearc/oil.nvim",
-    cmd = "Oil",
-    dependencies = {
-      "nvim-tree/nvim-web-devicons",
-    },
-    opts = {
-      default_file_explorer = false,
-      view_options = {
-        show_hidden = true,
-      },
-      keymaps = {
-        ["<CR>"] = "actions.none",
-        ["<C-j>"] = "actions.select",
-      },
-    },
-    keys = {
-      {
-        "-",
-        "<cmd>Oil<CR>",
-        desc = "Open Oil file manager",
-      },
-    },
-  },
-
-  ------------------------------------------------------------
-  -- nvim-treesitter: 構文解析 / 高精度ハイライト
-  --
-  -- Neovim 0.13 では Markdown の Treesitter highlighter で
-  -- "attempt to call method 'range' (a nil value)" が出る場合があるため,
-  -- Markdown では Treesitter を完全に起動しない.
-  --
-  -- Markdown は Vim 標準 syntax highlight を使う.
-  ------------------------------------------------------------
-  ---
-  ------------------------------------------------------------
-  -- nvim-treesitter: 構文解析 / 高精度ハイライト
-  --
-  -- Neovim 0.13 + nvim-treesitter main branch 用.
-  -- Markdown も Treesitter highlight を使う.
-  ------------------------------------------------------------
-  {
-    "nvim-treesitter/nvim-treesitter",
-    branch = "main",
-    event = { "BufReadPre", "BufNewFile" },
-
-    config = function()
-      local ok, ts = pcall(require, "nvim-treesitter")
-      if not ok then
-        return
-      end
-
-      ts.setup({
-        install_dir = vim.fn.stdpath("data") .. "/site",
-      })
-
-      local parsers = {
-        "lua",
-        "vim",
-        "vimdoc",
-        "python",
-        "bash",
-        "json",
-        "yaml",
-        "regex",
-        "markdown",
-        "markdown_inline",
-      }
-
-      pcall(ts.install, parsers)
-
-      vim.api.nvim_create_autocmd("FileType", {
-        group = vim.api.nvim_create_augroup("StartTreesitterForFiletypes", { clear = true }),
-        pattern = {
-          "lua",
-          "vim",
-          "vimdoc",
-          "python",
-          "bash",
-          "json",
-          "yaml",
-          "markdown",
-          "mdx",
-        },
-        callback = function(args)
-          pcall(vim.treesitter.start, args.buf)
-        end,
-      })
-
-      -- Markdown の indent は不安定になりやすいので無効化.
-      vim.api.nvim_create_autocmd("FileType", {
-        group = vim.api.nvim_create_augroup("DisableMarkdownTreesitterIndent", { clear = true }),
-        pattern = {
-          "markdown",
-          "mdx",
-        },
-        callback = function(args)
-          vim.bo[args.buf].indentexpr = ""
-        end,
-      })
-    end,
-  },
-
-  ------------------------------------------------------------
-  -- indent-blankline.nvim: インデントガイド表示
-  -- Markdown では Treesitter scope を使わせない
-  ------------------------------------------------------------
+  -- インデント位置と現在の構文スコープを縦線で可視化する．
   {
     "lukas-reineke/indent-blankline.nvim",
     main = "ibl",
     event = { "BufReadPost", "BufNewFile" },
     config = function()
-      local ok_ibl, ibl = pcall(require, "ibl")
-      if not ok_ibl then
-        return
-      end
-
-      local ok_hooks, hooks = pcall(require, "ibl.hooks")
-      if not ok_hooks then
-        return
-      end
-
+      local hooks = require("ibl.hooks")
       local rainbow = {
         "RainbowRed",
         "RainbowBlue",
@@ -498,15 +112,12 @@ return {
         vim.api.nvim_set_hl(0, "RainbowGreen", { fg = "#9ece6a" })
         vim.api.nvim_set_hl(0, "RainbowViolet", { fg = "#bb9af7" })
         vim.api.nvim_set_hl(0, "RainbowCyan", { fg = "#7dcfff" })
-        vim.api.nvim_set_hl(0, "IblIndent", { link = "LineNr" })
         vim.api.nvim_set_hl(0, "IblScope", { fg = "#c0caf5", bold = true, nocombine = true })
       end)
 
       hooks.register(hooks.type.SCOPE_HIGHLIGHT, hooks.builtin.scope_highlight_from_extmark)
 
-      ibl.setup({
-        enabled = true,
-
+      require("ibl").setup({
         exclude = {
           filetypes = {
             "help",
@@ -515,151 +126,115 @@ return {
             "neo-tree",
             "oil",
             "toggleterm",
-            "terminal",
-            "prompt",
             "noice",
             "notify",
             "markdown",
-            "markdown.mdx",
             "mdx",
           },
         },
-
         indent = {
           char = "│",
           highlight = rainbow,
         },
-
         scope = {
-          enabled = true,
           show_exact_scope = true,
           highlight = { "IblScope" },
           char = "┃",
           show_start = false,
           show_end = false,
         },
-
-        whitespace = {
-          remove_blankline_trail = true,
-        },
       })
     end,
   },
 
-  ------------------------------------------------------------
-  -- nvim-autopairs: 自動括弧補完
-  -- InsertEnter まで読み込まない
-  ------------------------------------------------------------
+  -- ==========================================================================
+
+  -- 検索・移動・ファイル操作
+
+  -- ==========================================================================
+
+  -- ファイル検索，全文検索，バッファ検索などを行うファジーファインダー．
   {
-    "windwp/nvim-autopairs",
-    event = "InsertEnter",
-    config = true,
+    "nvim-telescope/telescope.nvim",
+    cmd = "Telescope",
+    dependencies = { "nvim-lua/plenary.nvim" }, -- Telescopeが使用するLuaユーティリティ集．
+    keys = {
+      {
+        "<leader>tf",
+        function()
+          require("telescope.builtin").find_files()
+        end,
+        desc = "Find files",
+      },
+      {
+        "<leader>tg",
+        function()
+          require("telescope.builtin").live_grep()
+        end,
+        desc = "Live grep",
+      },
+      {
+        "<C-t>",
+        "<cmd>Telescope<CR>",
+        desc = "Open Telescope",
+      },
+    },
   },
 
-  ------------------------------------------------------------
-  -- toggleterm.nvim: ターミナル管理
-  -- :ToggleTerm / Ctrl-e 実行時だけ読み込む
-  ------------------------------------------------------------
+  -- ディレクトリ構造を左側のツリーとして表示・操作する．
   {
-    "akinsho/toggleterm.nvim",
-    version = "*",
-    cmd = {
-      "ToggleTerm",
-      "TermExec",
+    "nvim-neo-tree/neo-tree.nvim",
+    branch = "v3.x",
+    cmd = "Neotree",
+    dependencies = {
+      "nvim-lua/plenary.nvim", -- ファイル走査などの補助機能．
+      "nvim-tree/nvim-web-devicons", -- ファイル種別アイコン．
+      "MunifTanjim/nui.nvim", -- ツリーUIの構築．
+    },
+    opts = {
+      filesystem = {
+        async_directory_scan = "always",
+        bind_to_cwd = true,
+        follow_current_file = { enabled = true },
+        filtered_items = {
+          hide_dotfiles = false,
+          hide_gitignored = false,
+        },
+      },
+      window = {
+        position = "left",
+        width = 30,
+        mappings = {
+          ["<C-k>"] = "navigate_up",
+          ["<C-j>"] = "open",
+        },
+      },
+    },
+  },
+
+  -- ディレクトリを通常のバッファとして開き，ファイル操作を編集操作として行う．
+  {
+    "stevearc/oil.nvim",
+    cmd = "Oil",
+    dependencies = { "nvim-tree/nvim-web-devicons" }, -- ファイル種別アイコン．
+    opts = {
+      default_file_explorer = false,
+      view_options = { show_hidden = true },
+      keymaps = {
+        ["<CR>"] = "actions.none",
+        ["<C-j>"] = "actions.select",
+      },
     },
     keys = {
       {
-        "<C-e>",
-        "<cmd>ToggleTerm<CR>",
-        mode = { "n", "t" },
+        "-",
+        "<cmd>Oil<CR>",
+        desc = "Open Oil file manager",
       },
     },
-    opts = {
-      direction = "float",
-      float_opts = {
-        border = {
-          { "╭", "ToggleTermBorder" },
-          { "─", "ToggleTermBorder" },
-          { "╮", "ToggleTermBorder" },
-          { "│", "ToggleTermBorder" },
-          { "╯", "ToggleTermBorder" },
-          { "─", "ToggleTermBorder" },
-          { "╰", "ToggleTermBorder" },
-          { "│", "ToggleTermBorder" },
-        },
-        width = function()
-          return math.floor(vim.o.columns * 0.5)
-        end,
-        height = function()
-          return math.floor(vim.o.lines * 0.9)
-        end,
-        row = function()
-          local h = math.floor(vim.o.lines * 0.9)
-          return math.floor((vim.o.lines - h) / 2)
-        end,
-        col = function()
-          local w = math.floor(vim.o.columns * 0.5)
-          return vim.o.columns - w - 5
-        end,
-      },
-      shade_terminals = true,
-      persist_size = true,
-      persist_mode = true,
-    },
   },
 
-  ------------------------------------------------------------
-  -- vimtex: LaTeX 編集支援
-  -- tex / bib ファイルを開いた時だけ読み込む
-  ------------------------------------------------------------
-  {
-    "lervag/vimtex",
-    ft = {
-      "tex",
-      "plaintex",
-      "bib",
-    },
-    init = function()
-      vim.g.vimtex_view_method = "zathura"
-      vim.g.vimtex_compiler_method = "latexmk"
-      vim.g.vimtex_quickfix_mode = 0
-    end,
-  },
-
-  ------------------------------------------------------------
-  -- tokyonight.nvim: colorscheme
-  -- colorscheme は起動時に必要なので lazy = false
-  ------------------------------------------------------------
-  {
-    "folke/tokyonight.nvim",
-    lazy = false,
-    priority = 1000,
-    opts = {
-      style = "moon",
-      transparent = true,
-      show_end_of_buffer = false,
-    },
-    config = function(_, opts)
-      require("tokyonight").setup(opts)
-      vim.cmd.colorscheme("tokyonight-moon")
-
-      vim.api.nvim_create_autocmd("User", {
-        pattern = "VeryLazy",
-        once = true,
-        callback = function()
-          pcall(vim.api.nvim_set_hl, 0, "Comment", {
-            fg = "#8FAFC2",
-            ctermfg = "LightBlue",
-          })
-        end,
-      })
-    end,
-  },
-
-  ------------------------------------------------------------
-  -- flash.nvim: 高速ジャンプ
-  -- VeryLazy で読み込み、通常ジャンプのみ有効化
-  ------------------------------------------------------------
+  -- 画面内の候補文字へ少ないキー入力で高速にジャンプする．
   {
     "folke/flash.nvim",
     event = "VeryLazy",
@@ -682,31 +257,270 @@ return {
         desc = "Remote Flash",
       },
       {
-        "<c-s>",
-        mode = { "c" },
+        "<C-s>",
+        mode = "c",
         function()
           require("flash").toggle()
         end,
         desc = "Toggle Flash Search",
       },
-
-      -- Treesitter search は Neovim 0.13 の Markdown 問題が安定するまで無効化
-      -- {
-      --   "S",
-      --   mode = { "n", "x", "o" },
-      --   function()
-      --     require("flash").treesitter()
-      --   end,
-      --   desc = "Flash Treesitter",
-      -- },
-      -- {
-      --   "R",
-      --   mode = { "o", "x" },
-      --   function()
-      --     require("flash").treesitter_search()
-      --   end,
-      --   desc = "Treesitter Search",
-      -- },
     },
+  },
+
+  -- ==========================================================================
+
+  -- 構文解析・編集支援
+
+  -- ==========================================================================
+
+  -- Tree-sitterパーサーを管理し，構文解析に基づくハイライトを有効化する．
+  {
+    "nvim-treesitter/nvim-treesitter",
+    branch = "main",
+    lazy = false,
+    build = ":TSUpdate",
+    config = function()
+      local treesitter = require("nvim-treesitter")
+
+      treesitter.install({
+        "lua",
+        "vim",
+        "vimdoc",
+        "python",
+        "bash",
+        "json",
+        "yaml",
+        "regex",
+        "markdown",
+        "markdown_inline",
+      })
+
+      vim.treesitter.language.register("markdown", "mdx")
+
+      vim.api.nvim_create_autocmd("FileType", {
+        group = vim.api.nvim_create_augroup("TreesitterStart", { clear = true }),
+        pattern = {
+          "lua",
+          "vim",
+          "vimdoc",
+          "python",
+          "bash",
+          "json",
+          "yaml",
+          "markdown",
+          "mdx",
+        },
+        callback = function(args)
+          pcall(vim.treesitter.start, args.buf)
+        end,
+      })
+    end,
+  },
+
+  -- Tree-sitterの構文木を使い，リストや引数を1行・複数行へ相互変換する．
+  {
+    "Wansmer/treesj",
+    keys = { "<space>m", "<space>j", "<space>s" },
+    dependencies = { "nvim-treesitter/nvim-treesitter" },
+    opts = {},
+  },
+
+  -- 括弧や引用符を入力したとき，対応する閉じ文字を自動挿入する．
+  {
+    "windwp/nvim-autopairs",
+    event = "InsertEnter",
+    opts = {},
+  },
+
+  -- ==========================================================================
+
+  -- 補完・AI支援
+
+  -- ==========================================================================
+
+  -- GitHub Copilotの提案を取得する補完クライアント本体．
+  {
+    "zbirenbaum/copilot.lua",
+    event = "InsertEnter",
+    config = load_config("config.copilot"),
+  },
+
+  -- VS Code形式のスニペットを読み込み，展開する．
+  {
+    "L3MON4D3/LuaSnip",
+    event = "InsertEnter",
+    build = "make install_jsregexp",
+    config = function()
+      require("luasnip.loaders.from_vscode").lazy_load()
+    end,
+  },
+
+  -- Copilotの提案をnvim-cmpの候補として表示する連携プラグイン．
+  {
+    "zbirenbaum/copilot-cmp",
+    event = "InsertEnter",
+    dependencies = { "zbirenbaum/copilot.lua" },
+    config = function()
+      require("copilot_cmp").setup({
+        formatters = {
+          insert_text = require("copilot_cmp.format").remove_existing,
+        },
+      })
+    end,
+  },
+
+  -- LSP，Copilot，バッファ，パスなどの候補を統合する補完エンジン．
+  {
+    "hrsh7th/nvim-cmp",
+    event = "InsertEnter",
+    dependencies = {
+      "zbirenbaum/copilot-cmp", -- Copilot補完ソース．
+      "hrsh7th/cmp-nvim-lsp", -- LSP補完ソース．
+      "hrsh7th/cmp-buffer", -- 開いているバッファ内の単語を補完．
+      "hrsh7th/cmp-path", -- ファイルパスを補完．
+      "onsails/lspkind-nvim", -- 補完候補に種類別アイコンを表示．
+      "saadparwaiz1/cmp_luasnip", -- LuaSnipをnvim-cmpへ接続．
+      "L3MON4D3/LuaSnip", -- スニペット展開エンジン．
+    },
+    config = load_config("config.cmp"),
+  },
+
+  -- `:`，`/`，`?`などのコマンドラインにnvim-cmp補完を提供する．
+  {
+    "hrsh7th/cmp-cmdline",
+    event = "CmdlineEnter",
+    dependencies = { "hrsh7th/nvim-cmp" },
+  },
+
+  -- GitHub Copilot Chatを縦分割ウィンドウで利用する．
+  {
+    "CopilotC-Nvim/CopilotChat.nvim",
+    cmd = "CopilotChat",
+    dependencies = { "nvim-lua/plenary.nvim" }, -- 非同期処理などに使用．
+    opts = {
+      auto_insert_mode = true,
+      window = {
+        layout = "vertical",
+        width = 0.4,
+      },
+    },
+    config = function(_, opts)
+      vim.opt.splitright = true
+      require("CopilotChat").setup(opts)
+    end,
+    keys = {
+      {
+        "C",
+        function()
+          require("CopilotChat").toggle()
+        end,
+        desc = "CopilotChat: Toggle",
+      },
+    },
+  },
+
+  -- ==========================================================================
+
+  -- LSP・開発ツール
+
+  -- ==========================================================================
+
+  -- LSP，formatter，linterなどの外部ツールをインストール・管理する．
+  {
+    "mason-org/mason.nvim",
+    cmd = {
+      "Mason",
+      "MasonInstall",
+      "MasonUninstall",
+      "MasonUninstallAll",
+      "MasonLog",
+      "MasonUpdate",
+    },
+    opts = {},
+  },
+
+  -- Masonで導入したLSPとNeovim 0.12のLSP機能を接続する．
+  {
+    "mason-org/mason-lspconfig.nvim",
+    event = { "BufReadPre", "BufNewFile" },
+    dependencies = {
+      "mason-org/mason.nvim", -- 外部ツール管理．
+      "neovim/nvim-lspconfig", -- 各LSPサーバーの標準設定集．
+      "hrsh7th/cmp-nvim-lsp", -- LSPの補完能力をnvim-cmpへ渡す．
+    },
+    opts = {},
+    config = function(_, opts)
+      require("mason-lspconfig").setup(opts)
+      require("config.lsp")
+    end,
+  },
+
+  -- ==========================================================================
+
+  -- Git
+
+  -- ==========================================================================
+
+  -- lazygitをNeovim内から起動するGit操作用UI．
+  {
+    "kdheepak/lazygit.nvim",
+    cmd = "LazyGit",
+    dependencies = { "nvim-lua/plenary.nvim" }, -- Luaユーティリティ集．
+  },
+
+  -- ==========================================================================
+
+  -- ターミナル
+
+  -- ==========================================================================
+
+  -- Neovim内のターミナルをフローティングウィンドウとして開閉する．
+  {
+    "akinsho/toggleterm.nvim",
+    version = "*",
+    cmd = { "ToggleTerm", "TermExec" },
+    keys = {
+      {
+        "<C-e>",
+        "<cmd>ToggleTerm<CR>",
+        mode = { "n", "t" },
+      },
+    },
+    opts = {
+      direction = "float",
+      float_opts = {
+        border = "curved",
+        width = function()
+          return math.floor(vim.o.columns * 0.5)
+        end,
+        height = function()
+          return math.floor(vim.o.lines * 0.9)
+        end,
+        row = function()
+          local height = math.floor(vim.o.lines * 0.9)
+          return math.floor((vim.o.lines - height) / 2)
+        end,
+        col = function()
+          local width = math.floor(vim.o.columns * 0.5)
+          return vim.o.columns - width - 5
+        end,
+      },
+    },
+  },
+
+  -- ==========================================================================
+
+  -- LaTeX
+
+  -- ==========================================================================
+
+  -- LaTeX文書のコンパイル，PDF表示，エラー確認，補助編集を支援する．
+  {
+    "lervag/vimtex",
+    ft = { "tex", "plaintex", "bib" },
+    init = function()
+      vim.g.vimtex_view_method = "zathura"
+      vim.g.vimtex_quickfix_mode = 0
+    end,
   },
 }

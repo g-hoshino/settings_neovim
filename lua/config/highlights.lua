@@ -5,6 +5,7 @@
 local function set_my_hl()
   vim.api.nvim_set_hl(0, "Comment", {
     fg = "#8FAFC2",
+    ctermfg = "LightBlue",
     italic = false,
     nocombine = true,
   })

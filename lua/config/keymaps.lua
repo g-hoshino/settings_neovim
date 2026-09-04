@@ -12,8 +12,8 @@ map("i", "jj", "<ESC>", { silent = true })
 -- ノーマルモードで Space で行頭へ移動（^）
 map("n", "<Space>", "^", { noremap = true, silent = true })
 
--- コマンドラインモード（: / ? など）で <C-j> を Enter として扱う
-map('n', '<C-j>', ':', { noremap = true })
+-- <C-j> でコマンドラインを開く（; と同じ役割）
+map("n", "<C-j>", ":", { noremap = true })
 
 -- Ctrl+n で Neo-tree を左にトグル表示
 map("n", "<C-n>", ":Neotree toggle left<CR>")
@@ -30,7 +30,3 @@ map("n", ":", ";")
 -- W で保存, Q で終了
 map("n", "W", ":w<CR>", { desc = "保存" })
 map("n", "Q", ":q<CR>", { desc = "終了" })
-
--- LSP ショートカット
-map("n", "gd", vim.lsp.buf.definition, { desc = "定義ジャンプ" })
-map("n", "gr", vim.lsp.buf.references, { desc = "参照一覧" })

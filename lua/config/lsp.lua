@@ -11,12 +11,15 @@ vim.env.PATH = mason_bin .. ":" .. vim.env.PATH
 ------------------------------------------------------------
 -- capabilities
 ------------------------------------------------------------
-local capabilities = vim.lsp.protocol.make_client_capabilities()
+-- Neovim 側が make_client_capabilities() を必ずマージするため，
+-- ここでは nvim-cmp が上乗せする補完 capabilities だけを渡す．
+-- （default_capabilities() の引数は capabilities ではなくオプション表）
+local capabilities = {}
 
 do
   local ok_cmp, cmp_lsp = pcall(require, "cmp_nvim_lsp")
   if ok_cmp then
-    capabilities = cmp_lsp.default_capabilities(capabilities)
+    capabilities = cmp_lsp.default_capabilities()
   end
 end
 

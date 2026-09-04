@@ -76,7 +76,7 @@ local function get_terminal(name, command)
     })
   end
 
-  active_name = name
+  -- active_name は on_open で設定するため，ここでは触らない．
   return terminals[key]
 end
 

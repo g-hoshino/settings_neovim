@@ -40,7 +40,6 @@ opt.ttimeout = true
 opt.ttimeoutlen = 30
 
 -- 折りたたみ
--- 起動時は foldlevel=99 により全展開に近い状態
 opt.foldmethod = "indent"
 opt.foldenable = true
 opt.foldlevel = 99
