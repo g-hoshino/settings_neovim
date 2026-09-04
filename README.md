@@ -1,420 +1,338 @@
-# Neovim Setup
+# settings_neovim
 
-この README では, Linux 環境で Neovim を使うための最小構成をまとめます.
-Python provider は miniconda 環境を使い, Python 関連のライブラリも miniconda で管理します.
+Linux 環境向けの Neovim 設定です．`lazy.nvim` でプラグインを管理し，LSP・補完・Copilot・ターミナル LLM 連携をまとめています．
 
-## 1. 方針
+このリポジトリを `~/.config/nvim` としてクローンすれば，そのまま使えます．
 
-この設定では, 次の構成を使います.
+## 1. 特徴
 
-- Neovim 本体.
-- lazy.nvim によるプラグイン管理.
-- Treesitter による構文解析.
-- Telescope によるファイル検索.
-- nvim-lspconfig による LSP 設定.
-- cmp.nvim による補完.
-- miniconda による Python provider 管理.
+- `lazy.nvim` によるプラグイン管理（`lazy-lock.json` でバージョン固定）．
+- Neovim 標準の `vim.lsp.config` / `vim.lsp.enable` による LSP 設定．LSP サーバーは `mason.nvim` で導入．
+- `nvim-cmp` + `LuaSnip` + GitHub Copilot による補完．
+- `telescope.nvim`（検索），`neo-tree.nvim` / `oil.nvim`（ファイル操作），`flash.nvim`（ジャンプ）．
+- `toggleterm.nvim` のフローティングターミナル．`:Claude` / `:Codex` で LLM CLI を同じ見た目で起動．
+- カラースキームは `tokyonight-moon`（背景透過）．
+- Python provider は Miniconda の Python を使用．
 
-Neovim の Python provider には, miniconda の Python を明示的に指定します.
+## 2. 動作要件
 
-## 2. miniconda 環境の作成
+### 2.1 Neovim 本体
 
-まず, Neovim 用の conda 環境を作成します.
-
-```bash
-conda create -n nvim python=3.11 -y
-conda activate nvim
-```
-
-Neovim の Python provider に必要なライブラリをインストールします.
+Neovim **0.11 以上**が必要です（`vim.lsp.config`，`vim.diagnostic.jump` を使用）．0.12 系で動作確認しています．
 
 ```bash
-conda install -c conda-forge pynvim nodejs ripgrep fd-find -y
+nvim --version
 ```
 
-Python 開発でよく使うライブラリも, 必要に応じて同じ環境に入れます.
+### 2.2 必須の外部コマンド
+
+| コマンド | 用途 |
+|---|---|
+| `git` | lazy.nvim とプラグインの取得 |
+| `cc` / `gcc` などの C コンパイラ，`make` | Tree-sitter パーサーと LuaSnip の `jsregexp` のビルド |
+| `curl` または `wget`，`unzip`，`tar` | mason.nvim による LSP サーバーの取得 |
+| `node`，`npm` | Copilot および一部の LSP サーバー（pyright，yamlls）の実行 |
+
+### 2.3 推奨の外部コマンド
+
+| コマンド | 用途 | 無い場合 |
+|---|---|---|
+| `ripgrep`（`rg`） | Telescope の `live_grep` | 全文検索が動作しない |
+| `fd` | Telescope のファイル検索の高速化 | 検索が遅くなる |
+| `lazygit` | `:LazyGit` | コマンドが使えない |
+| `zathura` | VimTeX の PDF 表示 | LaTeX のプレビューが開かない |
+| `claude` / `codex` | LLM ターミナル連携 | `:Claude` / `:Codex` が使えない |
+
+### 2.4 フォント
+
+アイコン表示に **Nerd Font** が必要です．端末エミュレータ側で Nerd Font を設定してください．設定しない場合，ステータスラインやファイルツリーのアイコンが文字化けします．
+
+### 2.5 端末
+
+`termguicolors` を有効にしているため，true color 対応の端末が必要です．クリップボードは OSC52 を使うため，SSH 越しでもコピーが手元の端末に反映されます（端末側の OSC52 対応が必要）．
+
+## 3. Miniconda 環境の準備
+
+`lua/config/options.lua` は Python provider として `~/package/miniconda3/bin/python3` を参照します．
 
 ```bash
-conda install -c conda-forge numpy scipy matplotlib pandas ipython jupyter -y
+# Miniconda を ~/package/miniconda3 に導入している場合
+~/package/miniconda3/bin/python3 -m pip install pynvim
 ```
 
-LSP 用の Python パッケージを入れます.
+**Miniconda の場所が異なる場合**は，`lua/config/options.lua` の次の 2 行を自分の環境に合わせて書き換えてください．
+
+```lua
+vim.env.PATH = home .. "/package/miniconda3/bin:" .. vim.env.PATH
+vim.g.python3_host_prog = home .. "/package/miniconda3/bin/python3"
+```
+
+例（`~/miniconda3` に入れている場合）．
+
+```lua
+vim.env.PATH = home .. "/miniconda3/bin:" .. vim.env.PATH
+vim.g.python3_host_prog = home .. "/miniconda3/bin/python3"
+```
+
+Python を使わない場合は，この 2 行を削除しても他の機能は動作します．
+
+## 4. インストール
+
+### 4.1 既存設定のバックアップ
+
+既に `~/.config/nvim` がある場合は退避します．
 
 ```bash
-conda install -c conda-forge python-lsp-server ruff black isort -y
+mv ~/.config/nvim ~/.config/nvim.bak
+mv ~/.local/share/nvim ~/.local/share/nvim.bak
+mv ~/.local/state/nvim ~/.local/state/nvim.bak
+mv ~/.cache/nvim ~/.cache/nvim.bak
 ```
 
-## 3. ディレクトリ構成
+### 4.2 クローン
 
-Neovim の設定ファイルは, 次の構成にします.
-
-```text
-~/.config/nvim/
-├── init.lua
-└── lua/
-    ├── options.lua
-    ├── keymaps.lua
-    ├── plugins.lua
-    └── lsp.lua
+```bash
+git clone git@github.com:g-hoshino/settings_neovim.git ~/.config/nvim
 ```
 
-## 4. init.lua
+HTTPS を使う場合．
 
-`~/.config/nvim/init.lua` を作成します.
-
-```lua
-require("options")
-require("keymaps")
-require("plugins")
-require("lsp")
+```bash
+git clone https://github.com/g-hoshino/settings_neovim.git ~/.config/nvim
 ```
 
-## 5. options.lua
-
-`~/.config/nvim/lua/options.lua` を作成します.
-
-```lua
-local opt = vim.opt
-
-opt.number = true
-opt.relativenumber = true
-opt.cursorline = true
-opt.termguicolors = true
-
-opt.expandtab = true
-opt.shiftwidth = 4
-opt.tabstop = 4
-opt.smartindent = true
-
-opt.wrap = false
-opt.scrolloff = 8
-opt.sidescrolloff = 8
-
-opt.ignorecase = true
-opt.smartcase = true
-
-opt.splitright = true
-opt.splitbelow = true
-
-opt.clipboard = "unnamedplus"
-
-opt.undofile = true
-opt.swapfile = false
-opt.backup = false
-
-vim.g.python3_host_prog = os.getenv("HOME") .. "/package/miniconda3/envs/nvim/bin/python"
-```
-
-miniconda の場所が異なる場合は, 最後の行を自分の環境に合わせて変更します.
-
-例.
-
-```lua
-vim.g.python3_host_prog = os.getenv("HOME") .. "/miniconda3/envs/nvim/bin/python"
-```
-
-## 6. keymaps.lua
-
-`~/.config/nvim/lua/keymaps.lua` を作成します.
-
-```lua
-local keymap = vim.keymap.set
-local opts = { noremap = true, silent = true }
-
-vim.g.mapleader = " "
-
-keymap("n", "<leader>w", ":w<CR>", opts)
-keymap("n", "<leader>q", ":q<CR>", opts)
-
-keymap("n", "<leader>e", ":Ex<CR>", opts)
-
-keymap("n", "<C-h>", "<C-w>h", opts)
-keymap("n", "<C-j>", "<C-w>j", opts)
-keymap("n", "<C-k>", "<C-w>k", opts)
-keymap("n", "<C-l>", "<C-w>l", opts)
-
-keymap("n", "<leader>ff", "<cmd>Telescope find_files<CR>", opts)
-keymap("n", "<leader>fg", "<cmd>Telescope live_grep<CR>", opts)
-keymap("n", "<leader>fb", "<cmd>Telescope buffers<CR>", opts)
-keymap("n", "<leader>fh", "<cmd>Telescope help_tags<CR>", opts)
-
-keymap("n", "gd", vim.lsp.buf.definition, opts)
-keymap("n", "gr", vim.lsp.buf.references, opts)
-keymap("n", "K", vim.lsp.buf.hover, opts)
-keymap("n", "<leader>rn", vim.lsp.buf.rename, opts)
-keymap("n", "<leader>ca", vim.lsp.buf.code_action, opts)
-keymap("n", "<leader>f", function()
-  vim.lsp.buf.format({ async = true })
-end, opts)
-```
-
-## 7. plugins.lua
-
-`~/.config/nvim/lua/plugins.lua` を作成します.
-
-```lua
-local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
-
-if not vim.loop.fs_stat(lazypath) then
-  vim.fn.system({
-    "git",
-    "clone",
-    "--filter=blob:none",
-    "https://github.com/folke/lazy.nvim.git",
-    "--branch=stable",
-    lazypath,
-  })
-end
-
-vim.opt.rtp:prepend(lazypath)
-
-require("lazy").setup({
-  {
-    "nvim-lua/plenary.nvim",
-  },
-
-  {
-    "nvim-telescope/telescope.nvim",
-    dependencies = { "nvim-lua/plenary.nvim" },
-  },
-
-  {
-    "nvim-treesitter/nvim-treesitter",
-    build = ":TSUpdate",
-    config = function()
-      require("nvim-treesitter.configs").setup({
-        ensure_installed = {
-          "lua",
-          "python",
-          "bash",
-          "markdown",
-          "vim",
-          "vimdoc",
-        },
-        highlight = {
-          enable = true,
-        },
-        indent = {
-          enable = true,
-        },
-      })
-    end,
-  },
-
-  {
-    "neovim/nvim-lspconfig",
-  },
-
-  {
-    "hrsh7th/nvim-cmp",
-    dependencies = {
-      "hrsh7th/cmp-nvim-lsp",
-      "hrsh7th/cmp-buffer",
-      "hrsh7th/cmp-path",
-      "L3MON4D3/LuaSnip",
-      "saadparwaiz1/cmp_luasnip",
-    },
-  },
-
-  {
-    "numToStr/Comment.nvim",
-    config = function()
-      require("Comment").setup()
-    end,
-  },
-})
-```
-
-## 8. lsp.lua
-
-`~/.config/nvim/lua/lsp.lua` を作成します.
-
-```lua
-local lspconfig = require("lspconfig")
-
-local capabilities = require("cmp_nvim_lsp").default_capabilities()
-
-lspconfig.lua_ls.setup({
-  capabilities = capabilities,
-  settings = {
-    Lua = {
-      diagnostics = {
-        globals = { "vim" },
-      },
-    },
-  },
-})
-
-lspconfig.pylsp.setup({
-  capabilities = capabilities,
-  settings = {
-    pylsp = {
-      plugins = {
-        pycodestyle = {
-          enabled = false,
-        },
-        pyflakes = {
-          enabled = true,
-        },
-        ruff = {
-          enabled = true,
-        },
-        black = {
-          enabled = true,
-        },
-        isort = {
-          enabled = true,
-        },
-      },
-    },
-  },
-})
-
-local cmp = require("cmp")
-
-cmp.setup({
-  snippet = {
-    expand = function(args)
-      require("luasnip").lsp_expand(args.body)
-    end,
-  },
-  mapping = cmp.mapping.preset.insert({
-    ["<C-Space>"] = cmp.mapping.complete(),
-    ["<CR>"] = cmp.mapping.confirm({ select = true }),
-    ["<Tab>"] = cmp.mapping.select_next_item(),
-    ["<S-Tab>"] = cmp.mapping.select_prev_item(),
-  }),
-  sources = cmp.config.sources({
-    { name = "nvim_lsp" },
-    { name = "luasnip" },
-    { name = "path" },
-    { name = "buffer" },
-  }),
-})
-```
-
-## 9. 起動確認
-
-Neovim を起動します.
+### 4.3 初回起動
 
 ```bash
 nvim
 ```
 
-Python provider が正しく設定されているか確認します.
+初回起動時に `lazy.nvim` が自動でクローンされ，続いてプラグインがインストールされます．Tree-sitter パーサーのビルドも走るため，完了まで数分かかります．
+
+インストール状況は `:Lazy` で確認できます．すべて完了したら Neovim を再起動してください．
+
+> GitHub への接続が不安定な環境では，`lua/config/lazy.lua` の `concurrency = 2` を `1` に下げると失敗しにくくなります．
+
+### 4.4 LSP サーバーの導入
+
+LSP サーバーは `mason.nvim` で個別に入れます．Neovim 内で次を実行します．
 
 ```vim
-:checkhealth provider
+:MasonInstall pyright lua-language-server yaml-language-server taplo fortls
 ```
 
-Python provider の欄に, miniconda 環境の Python が表示されていれば問題ありません.
+対応は次のとおりです．
 
-LSP の状態は, Python ファイルを開いた状態で次を実行して確認します.
+| 言語 | サーバー | Mason パッケージ名 |
+|---|---|---|
+| Python | pyright | `pyright` |
+| Lua | lua_ls | `lua-language-server` |
+| YAML | yamlls | `yaml-language-server` |
+| TOML | taplo | `taplo` |
+| Fortran | fortls | `fortls` |
+
+必要な言語だけ入れて構いません．入れていないサーバーは単に起動しないだけです．
+
+### 4.5 Copilot の認証
+
+GitHub Copilot を使う場合，挿入モードに一度入ってから認証します．
 
 ```vim
-:LspInfo
+:Copilot auth
 ```
 
-`pylsp` が attached になっていれば, Python LSP が有効です.
+表示される URL とコードをブラウザで入力します．Copilot を使わない場合は，`lua/plugins.lua` の `copilot.lua`，`copilot-cmp`，`CopilotChat.nvim` の項目を削除してください．
 
-## 10. よく使う操作
+### 4.6 動作確認
+
+```vim
+:checkhealth
+```
+
+- `provider.python`：Miniconda の Python が表示されること．
+- `lazy`：プラグインのエラーが無いこと．
+- `mason`：必要な外部コマンドが検出されていること．
+
+Python ファイルを開いた状態で LSP の接続を確認します．
+
+```vim
+:checkhealth vim.lsp
+```
+
+## 5. ディレクトリ構成
+
+```text
+~/.config/nvim/
+├── init.lua                  # エントリポイント
+├── lazy-lock.json            # プラグインのバージョン固定
+├── lua/
+│   ├── plugins.lua           # lazy.nvim のプラグイン仕様
+│   └── config/
+│       ├── lazy.lua          # lazy.nvim のブートストラップと設定
+│       ├── options.lua       # 基本オプション，Python provider，OSC52
+│       ├── providers.lua     # 不要な provider の無効化
+│       ├── keymaps.lua       # グローバルキーマップ
+│       ├── highlights.lua    # ハイライト上書き（透過など）
+│       ├── llm.lua           # :Claude / :Codex ターミナル
+│       ├── lsp.lua           # LSP サーバー設定
+│       ├── cmp.lua           # 補完設定
+│       ├── copilot.lua       # Copilot 設定
+│       └── lualine.lua       # ステータスライン設定
+└── docs/
+    └── llm-terminals.md      # LLM ターミナル連携の詳細
+```
+
+`lua/plugins.lua` に書いたプラグインを `lazy.nvim` が読み込み，各プラグインの設定は `lua/config/` 以下に分離しています．
+
+## 6. キーマップ
+
+Leader は `<Space>`，local leader は `\` です．
+
+### 6.1 基本
 
 | 操作 | キー |
 |---|---|
-| 保存 | `<leader>w` |
-| 終了 | `<leader>q` |
-| ファイル一覧 | `<leader>ff` |
-| 文字列検索 | `<leader>fg` |
-| buffer 一覧 | `<leader>fb` |
+| 保存 | `W` |
+| 終了 | `Q` |
+| 検索ハイライト解除 | `<Esc><Esc>` |
+| ノーマルモードへ戻る（挿入モード） | `jj` |
+| コマンドラインを開く | `<C-j>` |
+| 前方検索 | `<C-f>` |
+| 行頭へ移動 | `<Space>` |
+
+> **注意**：`:` と `;` を入れ替えています（ノーマルモード・挿入モードの両方）．`:` を押すと `;` が入力されます．コマンドラインは `;` または `<C-j>` で開きます．この挙動が不要なら `lua/config/keymaps.lua` の該当行を削除してください．
+
+### 6.2 ファイル・検索
+
+| 操作 | キー |
+|---|---|
+| ファイル検索（Telescope） | `<leader>tf` |
+| 全文検索（Telescope） | `<leader>tg` |
+| Telescope 一覧 | `<C-t>` |
+| Neo-tree のトグル | `<C-n>` |
+| Oil でディレクトリを開く | `-` |
+| Flash ジャンプ | `s` |
+
+### 6.3 LSP
+
+LSP が接続されたバッファでのみ有効です．
+
+| 操作 | キー |
+|---|---|
 | 定義へ移動 | `gd` |
+| 宣言へ移動 | `gD` |
+| 実装へ移動 | `gi` |
 | 参照一覧 | `gr` |
 | hover 表示 | `K` |
 | rename | `<leader>rn` |
 | code action | `<leader>ca` |
-| format | `<leader>f` |
-| コメント切り替え | `gcc` |
+| 前の診断へ | `[d` |
+| 次の診断へ | `]d` |
 
-## 11. トラブルシュート
+### 6.4 補完
 
-### Python provider が見つからない場合
+| 操作 | キー |
+|---|---|
+| 補完を開く | `<C-Space>` |
+| 次の候補 | `<Tab>` |
+| 前の候補 | `<S-Tab>` |
+| 確定 | `<CR>` |
+| 補完を閉じる | `<C-e>` |
 
-`pynvim` が入っているか確認します.
+### 6.5 ターミナル・LLM
 
-```bash
-conda activate nvim
-python -c "import pynvim; print(pynvim.__version__)"
-```
+| 操作 | コマンド | キー |
+|---|---|---|
+| 通常のターミナル | `:ToggleTerm` | `<C-e>` |
+| LLM を選択して起動 | `:LLM` | `<leader>aa` |
+| Claude Code | `:Claude` | `<leader>ac` |
+| Codex CLI | `:Codex` | `<leader>ax` |
+| 直近の LLM を表示 | `:LLMStatus` | - |
+| ターミナルモードを抜ける | - | `<Esc><Esc>` |
+| LLM ターミナルを隠す | - | `<C-e>` |
 
-エラーが出る場合は, 再度インストールします.
+詳細は [docs/llm-terminals.md](docs/llm-terminals.md) を参照してください．
 
-```bash
-conda install -c conda-forge pynvim -y
-```
+### 6.6 その他
 
-### live_grep が動かない場合
+| 操作 | キー |
+|---|---|
+| Copilot Chat のトグル | `C` |
+| 1 行 ↔ 複数行の変換（treesj） | `<Space>m` / `<Space>j` / `<Space>s` |
+| lazygit の起動 | `:LazyGit` |
 
-`ripgrep` が入っているか確認します.
+## 7. 更新
 
-```bash
-rg --version
-```
-
-入っていない場合は, conda でインストールします.
-
-```bash
-conda install -c conda-forge ripgrep -y
-```
-
-### find_files が遅い場合
-
-`fd` が入っているか確認します.
-
-```bash
-fd --version
-```
-
-入っていない場合は, conda でインストールします.
-
-```bash
-conda install -c conda-forge fd-find -y
-```
-
-### LSP が起動しない場合
-
-Python LSP が入っているか確認します.
-
-```bash
-conda activate nvim
-pylsp --version
-```
-
-入っていない場合は, conda でインストールします.
-
-```bash
-conda install -c conda-forge python-lsp-server -y
-```
-
-## 12. 最小更新手順
-
-設定を更新した後は, Neovim 内で次を実行します.
+プラグインを更新します．
 
 ```vim
-:Lazy sync
+:Lazy update
 ```
 
-Treesitter を更新する場合は, 次を実行します.
+更新後は `lazy-lock.json` が変化するので，問題なければコミットしてください．
+
+Tree-sitter パーサーを更新します．
 
 ```vim
 :TSUpdate
 ```
 
-LSP の挙動がおかしい場合は, Neovim を再起動してから確認します.
+LSP サーバーを更新します．
 
 ```vim
-:LspInfo
+:MasonUpdate
 ```
 
-## 13. まとめ
+## 8. トラブルシュート
 
-この構成では, Neovim 本体の設定を Lua で管理し, Python provider と Python 開発用ライブラリを miniconda に集約します.
-これにより, Python 環境の依存関係を system Python から分離でき, HPC 環境や研究用 Linux 環境でも再現しやすい設定になります.
+### プラグインのインストールが途中で失敗する
+
+GitHub への接続が不安定な場合に起きます．`lua/config/lazy.lua` の `concurrency` を `1` に下げ，`:Lazy restore` でロックファイルの状態に戻してから再試行してください．
+
+### アイコンが文字化けする
+
+端末のフォントが Nerd Font になっていません．端末側の設定を確認してください．
+
+### Python provider が見つからない
+
+`:checkhealth provider` で確認します．`pynvim` が入っていない場合は入れます．
+
+```bash
+~/package/miniconda3/bin/python3 -m pip install pynvim
+```
+
+パスが異なる場合は，[3. Miniconda 環境の準備](#3-miniconda-環境の準備)のとおり `lua/config/options.lua` を修正します．
+
+### LSP が起動しない
+
+Mason でサーバーが入っているか確認します．
+
+```vim
+:Mason
+```
+
+`lua/config/lsp.lua` は Mason の `bin` ディレクトリを `PATH` に追加してから各サーバーを起動します．手動で入れたサーバーを使う場合は，そのコマンドが `PATH` にあることを確認してください．
+
+### `live_grep` が動かない
+
+`ripgrep` が必要です．
+
+```bash
+rg --version
+```
+
+### 背景が透過しない
+
+`lua/config/highlights.lua` で `Normal` などの背景を `none` にしています．端末側の背景が不透明だと透過しません．端末エミュレータの透過設定を確認してください．透過が不要な場合は，`lua/plugins.lua` の `tokyonight.nvim` の `transparent = true` を `false` にし，`lua/config/highlights.lua` の `set_transparent_highlights` の呼び出しを外してください．
+
+### 設定を元に戻したい
+
+クローン前にバックアップしていれば，次で戻せます．
+
+```bash
+rm -rf ~/.config/nvim ~/.local/share/nvim ~/.local/state/nvim ~/.cache/nvim
+mv ~/.config/nvim.bak ~/.config/nvim
+mv ~/.local/share/nvim.bak ~/.local/share/nvim
+mv ~/.local/state/nvim.bak ~/.local/state/nvim
+mv ~/.cache/nvim.bak ~/.cache/nvim
+```
