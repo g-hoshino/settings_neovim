@@ -2,30 +2,24 @@
 -- ハイライト：コメント色／行番号／透明背景
 ------------------------------------------------------------
 
+local comment_fg = "#8FAFC2"
+
 local function set_my_hl()
   vim.api.nvim_set_hl(0, "Comment", {
-    fg = "#8FAFC2",
+    fg = comment_fg,
     ctermfg = "LightBlue",
     italic = false,
     nocombine = true,
   })
 
   vim.api.nvim_set_hl(0, "CursorLineNr", {
-    fg = "#8FAFC2",
+    fg = comment_fg,
     bold = true,
   })
 
-  vim.api.nvim_set_hl(0, "LineNr", {
-    fg = "#8FAFC2",
-  })
-
-  vim.api.nvim_set_hl(0, "LineNrAbove", {
-    fg = "#8FAFC2",
-  })
-
-  vim.api.nvim_set_hl(0, "LineNrBelow", {
-    fg = "#8FAFC2",
-  })
+  for _, group in ipairs({ "LineNr", "LineNrAbove", "LineNrBelow" }) do
+    vim.api.nvim_set_hl(0, group, { fg = comment_fg })
+  end
 
   vim.api.nvim_set_hl(0, "FloatBorder", {
     fg = "#ff00ff",
@@ -63,13 +57,9 @@ local function set_transparent_highlights()
 end
 
 local function set_copilot_hl()
-  pcall(vim.api.nvim_set_hl, 0, "CopilotSuggestion", {
-    link = "Comment",
-  })
-
-  pcall(vim.api.nvim_set_hl, 0, "CmpGhostText", {
-    link = "Comment",
-  })
+  for _, group in ipairs({ "CopilotSuggestion", "CmpGhostText" }) do
+    pcall(vim.api.nvim_set_hl, 0, group, { link = "Comment" })
+  end
 end
 
 local function apply_highlights()
@@ -87,9 +77,6 @@ vim.api.nvim_create_autocmd("ColorScheme", {
 
 vim.api.nvim_create_autocmd("User", {
   group = vim.api.nvim_create_augroup("UserCopilotHighlightOverrides", { clear = true }),
-  pattern = {
-    "CopilotLoaded",
-    "CopilotAttach",
-  },
+  pattern = { "CopilotLoaded", "CopilotAttach" },
   callback = set_copilot_hl,
 })

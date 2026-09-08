@@ -12,7 +12,19 @@ copilot.setup({
     keymap = { accept = false },
   },
 
-  should_attach = function()
+  -- 既定の should_attach はバッファ種別やサイズを見て弾く．
+  -- 常に true を返すとその判定を潰してしまうので，
+  -- 大きいファイルと無名バッファは自前で除外する．
+  should_attach = function(bufnr)
+    if vim.b[bufnr].bigfile then
+      return false
+    end
+    if vim.api.nvim_buf_get_name(bufnr) == "" then
+      return false
+    end
+    if vim.api.nvim_buf_line_count(bufnr) > 40000 then
+      return false
+    end
     return true
   end,
 
@@ -20,7 +32,8 @@ copilot.setup({
     settings = {
       advanced = {
         inlineSuggestDelayMs = 100,
-        networkTimeoutMs = 300,
+        -- 300ms は短すぎて，回線が遅いときに提案が黙って落ちる．
+        networkTimeoutMs = 3000,
       },
     },
   },

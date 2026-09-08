@@ -22,7 +22,7 @@ vim.opt.rtp:prepend(lazypath)
 
 -- leader は lazy.nvim setup より前に設定する
 vim.g.mapleader = " "
-vim.g.maplocalleader = "\\"
+vim.g.maplocalleader = ","
 
 require("lazy").setup("plugins", {
   rocks = {

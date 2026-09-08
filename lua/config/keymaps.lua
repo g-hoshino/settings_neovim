@@ -1,16 +1,19 @@
 ------------------------------------------------------------
 -- キーマッピング
+--
+-- leader は <Space>（config/lazy.lua で設定）．
+-- <Space> 単体にマッピングを置くと，leader 系マッピングとの曖昧判定で
+-- timeoutlen（300ms）ぶん待たされるため，<Space> 単体は空けておく．
 ------------------------------------------------------------
 local map = vim.keymap.set
 
--- ESC 2回で検索ハイライト解除
-map("n", "<Esc><Esc>", ":nohlsearch<CR><Esc>")
+-- 検索ハイライト解除（+ 画面再描画）
+-- 以前は <Esc><Esc> だったが，ノーマルモードでの単発 <Esc> が
+-- timeoutlen ぶん待たされるため <C-l> へ移動した．
+map("n", "<C-l>", "<cmd>nohlsearch<CR><C-l>", { silent = true, desc = "検索ハイライト解除" })
 
 -- 挿入モードで jj でノーマルモード
 map("i", "jj", "<ESC>", { silent = true })
-
--- ノーマルモードで Space で行頭へ移動（^）
-map("n", "<Space>", "^", { noremap = true, silent = true })
 
 -- <C-j> でコマンドラインを開く（; と同じ役割）
 map("n", "<C-j>", ":", { noremap = true })

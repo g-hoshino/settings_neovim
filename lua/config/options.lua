@@ -33,13 +33,15 @@ opt.autoread = true
 opt.showcmd = true
 opt.smartindent = true
 opt.showmatch = true
-opt.laststatus = 2
+opt.laststatus = 3 -- lualine の globalstatus = true と対応させる
 opt.timeout = true
 opt.timeoutlen = 300
 opt.ttimeout = true
 opt.ttimeoutlen = 30
 
 -- 折りたたみ
+-- indent は編集のたびに全行の fold level を再計算するため，
+-- 大きいファイルでは config.bigfile 側で manual に切り替える．
 opt.foldmethod = "indent"
 opt.foldenable = true
 opt.foldlevel = 99
@@ -58,12 +60,19 @@ opt.hlsearch = true
 
 -- クリップボード／履歴
 opt.clipboard = "unnamedplus"
-opt.shada = "'20,\"10000"
+opt.shada = "'20,\"1000"
 
 -- OSC52 clipboard
+-- copy は端末へ書き込むだけなので OSC52 を使う．
+-- paste は OSC52 だと端末応答を vim.wait() で同期的に待ち，応答しない端末では
+-- 貼り付けのたびに最大 1 秒ブロックするため，直前の yank レジスタを返す．
 do
   local ok, osc52 = pcall(require, "vim.ui.clipboard.osc52")
   if ok then
+    local function paste_from_unnamed()
+      return vim.split(vim.fn.getreg('"'), "\n")
+    end
+
     vim.g.clipboard = {
       name = "osc52",
       copy = {
@@ -71,8 +80,8 @@ do
         ["*"] = osc52.copy("*"),
       },
       paste = {
-        ["+"] = osc52.paste("+"),
-        ["*"] = osc52.paste("*"),
+        ["+"] = paste_from_unnamed,
+        ["*"] = paste_from_unnamed,
       },
     }
   end

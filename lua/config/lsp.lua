@@ -2,25 +2,20 @@
 -- luacheck: globals vim
 
 ------------------------------------------------------------
--- Mason の bin を PATH に追加
--- Mason で入れた pyright-langserver などを Neovim から見えるようにする
+-- LSP
+--
+-- cmd / filetypes / root_markers / settings は nvim-lspconfig 同梱の
+-- lsp/<name>.lua をそのまま使う（Neovim が runtimepath から自動解決する）．
+-- ここに書くのは，同梱設定では足りない分の上書きだけ．
+------------------------------------------------------------
+
+------------------------------------------------------------
+-- MasonのbinをPATHに追加
+-- Mason本体を読み込まずに，導入済みのLSP実行ファイルを利用する．
 ------------------------------------------------------------
 local mason_bin = vim.fn.stdpath("data") .. "/mason/bin"
-vim.env.PATH = mason_bin .. ":" .. vim.env.PATH
-
-------------------------------------------------------------
--- capabilities
-------------------------------------------------------------
--- Neovim 側が make_client_capabilities() を必ずマージするため，
--- ここでは nvim-cmp が上乗せする補完 capabilities だけを渡す．
--- （default_capabilities() の引数は capabilities ではなくオプション表）
-local capabilities = {}
-
-do
-  local ok_cmp, cmp_lsp = pcall(require, "cmp_nvim_lsp")
-  if ok_cmp then
-    capabilities = cmp_lsp.default_capabilities()
-  end
+if not vim.env.PATH:find(mason_bin, 1, true) then
+  vim.env.PATH = mason_bin .. ":" .. vim.env.PATH
 end
 
 ------------------------------------------------------------
@@ -39,35 +34,13 @@ vim.diagnostic.config({
 pcall(vim.lsp.log.set_level, "off")
 
 ------------------------------------------------------------
--- root_dir helper for Neovim 0.13
--- root marker が見つからない単独ファイルでも cwd を root にする
-------------------------------------------------------------
-local function root_dir_from(markers)
-  return function(bufnr, on_dir)
-    local fname = vim.api.nvim_buf_get_name(bufnr)
-
-    local root = nil
-    if fname ~= "" then
-      root = vim.fs.root(fname, markers)
-    end
-
-    on_dir(root or vim.fn.getcwd())
-  end
-end
-
-------------------------------------------------------------
--- LspAttach: LSP が buffer に attach した時だけ keymap を設定
--- Copilot は definition を提供しないため除外
+-- LspAttach
 ------------------------------------------------------------
 vim.api.nvim_create_autocmd("LspAttach", {
   group = vim.api.nvim_create_augroup("UserLspAttach", { clear = true }),
   callback = function(args)
     local client = vim.lsp.get_client_by_id(args.data.client_id)
-    if not client then
-      return
-    end
-
-    if client.name == "copilot" then
+    if not client or client.name == "copilot" then
       return
     end
 
@@ -78,7 +51,7 @@ vim.api.nvim_create_autocmd("LspAttach", {
       client.server_capabilities.documentRangeFormattingProvider = false
     end
 
-    local map = function(mode, lhs, rhs, desc)
+    local function map(mode, lhs, rhs, desc)
       vim.keymap.set(mode, lhs, rhs, {
         buffer = bufnr,
         silent = true,
@@ -87,9 +60,11 @@ vim.api.nvim_create_autocmd("LspAttach", {
     end
 
     map("n", "gd", function()
-      local clients = vim.lsp.get_clients({ bufnr = bufnr })
-      for _, c in ipairs(clients) do
-        if c.name ~= "copilot" and c:supports_method("textDocument/definition") then
+      for _, attached_client in ipairs(vim.lsp.get_clients({ bufnr = bufnr })) do
+        if
+          attached_client.name ~= "copilot"
+          and attached_client:supports_method("textDocument/definition")
+        then
           vim.lsp.buf.definition()
           return
         end
@@ -105,7 +80,6 @@ vim.api.nvim_create_autocmd("LspAttach", {
     map("n", "gi", vim.lsp.buf.implementation, "Goto Implementation")
     map("n", "gr", vim.lsp.buf.references, "References")
     map("n", "K", vim.lsp.buf.hover, "Hover")
-
     map("n", "<leader>rn", vim.lsp.buf.rename, "Rename")
     map("n", "<leader>ca", vim.lsp.buf.code_action, "Code Action")
 
@@ -122,62 +96,63 @@ vim.api.nvim_create_autocmd("LspAttach", {
 ------------------------------------------------------------
 -- 共通設定
 ------------------------------------------------------------
+local capabilities = {}
+
+do
+  local ok_cmp, cmp_lsp = pcall(require, "cmp_nvim_lsp")
+  if ok_cmp then
+    capabilities = cmp_lsp.default_capabilities()
+  end
+end
+
 vim.lsp.config("*", {
   capabilities = capabilities,
 })
 
 ------------------------------------------------------------
--- pyright: Python
+-- 同梱設定への上書き
 ------------------------------------------------------------
-vim.lsp.config("pyright", {
-  cmd = { "pyright-langserver", "--stdio" },
-  filetypes = { "python" },
 
-  root_dir = root_dir_from({
-    "pyrightconfig.json",
-    "pyproject.toml",
-    "setup.py",
-    "setup.cfg",
-    "requirements.txt",
-    "Pipfile",
-    ".git",
-  }),
+-- Neovim設定では設定ディレクトリだけをworkspaceにする．
+-- dotfiles全体や起動時のcwdを誤って走査することを防ぐ．
+local nvim_config_dir = vim.fs.normalize(vim.fn.stdpath("config"))
 
-  settings = {
-    python = {
-      analysis = {
-        autoSearchPaths = true,
-        diagnosticMode = "openFilesOnly",
-        useLibraryCodeForTypes = true,
-      },
-    },
-  },
-})
+local function lua_root_dir(bufnr, on_dir)
+  local fname = vim.api.nvim_buf_get_name(bufnr)
+  if fname == "" then
+    on_dir(nil)
+    return
+  end
 
-------------------------------------------------------------
--- lua_ls: Lua
-------------------------------------------------------------
-vim.lsp.config("lua_ls", {
-  cmd = { "lua-language-server" },
-  filetypes = { "lua" },
+  fname = vim.fs.normalize(fname)
+  if fname == nvim_config_dir or fname:sub(1, #nvim_config_dir + 1) == nvim_config_dir .. "/" then
+    on_dir(nvim_config_dir)
+    return
+  end
 
-  root_dir = root_dir_from({
+  local root = vim.fs.root(fname, {
     ".luarc.json",
     ".luarc.jsonc",
     ".git",
-  }),
+  })
 
+  on_dir(root or vim.fs.dirname(fname))
+end
+
+vim.lsp.config("lua_ls", {
+  root_dir = lua_root_dir,
   settings = {
     Lua = {
+      runtime = {
+        version = "LuaJIT",
+      },
       diagnostics = {
         globals = { "vim" },
       },
       workspace = {
         checkThirdParty = false,
-        library = {
-          vim.env.VIMRUNTIME,
-          vim.fn.stdpath("config"),
-        },
+        -- lazydev.nvimが必要なモジュールだけを動的に追加する．
+        library = {},
       },
       telemetry = {
         enable = false,
@@ -186,77 +161,31 @@ vim.lsp.config("lua_ls", {
   },
 })
 
-------------------------------------------------------------
--- yamlls: YAML
-------------------------------------------------------------
+-- 同梱設定のマーカーは .git だけなので，lint 設定ファイルも root として扱う．
 vim.lsp.config("yamlls", {
-  cmd = { "yaml-language-server", "--stdio" },
-  filetypes = { "yaml", "yaml.docker-compose" },
-
-  root_dir = root_dir_from({
+  root_markers = {
     ".yamllint",
     ".yamllint.yaml",
     ".yamllint.yml",
     ".git",
-  }),
-
-  settings = {
-    redhat = {
-      telemetry = {
-        enabled = false,
-      },
-    },
-    yaml = {
-      format = {
-        enable = true,
-      },
-    },
   },
 })
 
-------------------------------------------------------------
--- taplo: TOML
-------------------------------------------------------------
+-- 同梱設定のマーカーに pyproject.toml を足す．
 vim.lsp.config("taplo", {
-  cmd = { "taplo", "lsp", "stdio" },
-  filetypes = { "toml" },
-
-  root_dir = root_dir_from({
+  root_markers = {
     ".taplo.toml",
     "taplo.toml",
     "pyproject.toml",
     ".git",
-  }),
-})
-
-------------------------------------------------------------
--- fortls: Fortran
-------------------------------------------------------------
-vim.lsp.config("fortls", {
-  cmd = {
-    "fortls",
-    "--notify_init",
-    "--hover_signature",
-    "--hover_language=fortran",
-    "--use_signature_help",
   },
-
-  filetypes = { "fortran" },
-
-  root_dir = root_dir_from({
-    ".fortls",
-    ".fortlsrc",
-    ".fortls.json",
-    "fpm.toml",
-    "CMakeLists.txt",
-    "Makefile",
-    ".git",
-  }),
 })
 
 ------------------------------------------------------------
--- LSP enable
--- まずは必要最小限だけ有効化
+-- 有効化
+--
+-- vim.lsp.enable() 自身が FileType を見てから起動するので，
+-- ここで filetype ごとの振り分けを持つ必要はない．
 ------------------------------------------------------------
 vim.lsp.enable({
   "pyright",

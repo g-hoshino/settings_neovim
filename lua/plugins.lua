@@ -48,6 +48,11 @@ return {
     },
     opts = {
       lsp = {
+        -- LuaLSなどのワークスペース読込進捗を画面に表示しない．
+        -- LSPの診断・補完機能には影響しない．
+        progress = {
+          enabled = false,
+        },
         override = {
           ["vim.lsp.util.convert_input_to_markdown_lines"] = true,
           ["vim.lsp.util.stylize_markdown"] = true,
@@ -157,7 +162,20 @@ return {
   {
     "nvim-telescope/telescope.nvim",
     cmd = "Telescope",
-    dependencies = { "nvim-lua/plenary.nvim" }, -- Telescopeが使用するLuaユーティリティ集．
+    dependencies = {
+      "nvim-lua/plenary.nvim", -- Telescopeが使用するLuaユーティリティ集．
+      {
+        -- ネイティブのfzfソーターを使い，候補が多いときの絞り込みを高速化する．
+        "nvim-telescope/telescope-fzf-native.nvim",
+        build = "make",
+      },
+    },
+    config = function()
+      local telescope = require("telescope")
+      telescope.setup({})
+      -- ビルドに失敗した環境ではLua実装のソーターにフォールバックする．
+      pcall(telescope.load_extension, "fzf")
+    end,
     keys = {
       {
         "<leader>tf",
@@ -237,7 +255,8 @@ return {
   -- 画面内の候補文字へ少ないキー入力で高速にジャンプする．
   {
     "folke/flash.nvim",
-    event = "VeryLazy",
+    -- keys で遅延読み込みするため event = "VeryLazy" は付けない
+    -- （付けると起動時に読み込まれてしまう）．
     opts = {},
     keys = {
       {
@@ -311,6 +330,10 @@ return {
           "mdx",
         },
         callback = function(args)
+          -- 大きいファイルでは構文解析を走らせない（config.bigfile が判定する）．
+          if vim.b[args.buf].bigfile then
+            return
+          end
           pcall(vim.treesitter.start, args.buf)
         end,
       })
@@ -320,9 +343,35 @@ return {
   -- Tree-sitterの構文木を使い，リストや引数を1行・複数行へ相互変換する．
   {
     "Wansmer/treesj",
-    keys = { "<space>m", "<space>j", "<space>s" },
     dependencies = { "nvim-treesitter/nvim-treesitter" },
-    opts = {},
+    -- 既定のマッピングはleader直下の1文字を3つ占有し，
+    -- 他のマッピングと衝突しやすいため<leader>jグループへまとめる．
+    keys = {
+      {
+        "<leader>jt",
+        function()
+          require("treesj").toggle()
+        end,
+        desc = "Treesj: Toggle",
+      },
+      {
+        "<leader>jj",
+        function()
+          require("treesj").join()
+        end,
+        desc = "Treesj: Join",
+      },
+      {
+        "<leader>js",
+        function()
+          require("treesj").split()
+        end,
+        desc = "Treesj: Split",
+      },
+    },
+    opts = {
+      use_default_keymaps = false,
+    },
   },
 
   -- 括弧や引用符を入力したとき，対応する閉じ文字を自動挿入する．
@@ -348,7 +397,10 @@ return {
   -- VS Code形式のスニペットを読み込み，展開する．
   {
     "L3MON4D3/LuaSnip",
-    event = "InsertEnter",
+    -- nvim-cmp の dependencies に入っているため，nvim-cmp と一緒に読まれる．
+    -- トップレベルに spec を書くと lazy.nvim は依存とみなさないので，
+    -- lazy = true を明示しないと起動時に読み込まれてしまう．
+    lazy = true,
     build = "make install_jsregexp",
     config = function()
       require("luasnip.loaders.from_vscode").lazy_load()
@@ -358,7 +410,9 @@ return {
   -- Copilotの提案をnvim-cmpの候補として表示する連携プラグイン．
   {
     "zbirenbaum/copilot-cmp",
-    event = "InsertEnter",
+    -- nvim-cmp の dependencies に入っているため，nvim-cmp と一緒に読まれる．
+    -- LuaSnip と同じ理由で lazy = true を明示する．
+    lazy = true,
     dependencies = { "zbirenbaum/copilot.lua" },
     config = function()
       require("copilot_cmp").setup({
@@ -385,12 +439,10 @@ return {
     config = load_config("config.cmp"),
   },
 
-  -- `:`，`/`，`?`などのコマンドラインにnvim-cmp補完を提供する．
-  {
-    "hrsh7th/cmp-cmdline",
-    event = "CmdlineEnter",
-    dependencies = { "hrsh7th/nvim-cmp" },
-  },
+  -- cmp-cmdlineは cmp.setup.cmdline() を書いて初めて機能する．
+  -- 設定が無いまま CmdlineEnter で読み込むと，`:` や `/` を押すたびに
+  -- nvim-cmp 一式をロードするだけになるため外した．
+  -- 使う場合はここに spec を戻し，config/cmp.lua に cmp.setup.cmdline() を書く．
 
   -- GitHub Copilot Chatを縦分割ウィンドウで利用する．
   {
@@ -426,6 +478,7 @@ return {
   -- ==========================================================================
 
   -- LSP，formatter，linterなどの外部ツールをインストール・管理する．
+  -- 通常起動時には読み込まず，Masonコマンドを実行したときだけ読み込む．
   {
     "mason-org/mason.nvim",
     cmd = {
@@ -439,20 +492,45 @@ return {
     opts = {},
   },
 
-  -- Masonで導入したLSPとNeovim 0.12のLSP機能を接続する．
+  -- LspInstall/LspUninstallを使う場合だけMasonとの名前変換機能を読み込む．
+  -- ensure_installedは起動時の確認処理を発生させるため，ここでは使用しない．
   {
     "mason-org/mason-lspconfig.nvim",
-    event = { "BufReadPre", "BufNewFile" },
+    cmd = { "LspInstall", "LspUninstall" },
+    -- mason.nvim は上で spec を定義済みなので，名前の参照だけでよい．
+    dependencies = { "mason-org/mason.nvim" },
+    opts = {
+      automatic_enable = false,
+    },
+  },
+
+  -- Neovim用Luaモジュールを，requireされたときだけLuaLSへ追加する．
+  -- VIMRUNTIMEや全プラグインを起動時に走査する負荷を避ける．
+  {
+    "folke/lazydev.nvim",
+    ft = "lua",
+    opts = {
+      library = {
+        { path = "${3rd}/luv/library", words = { "vim%.uv" } },
+      },
+    },
+  },
+
+  -- 対応するソースファイルを開いた場合だけLSP設定を読み込む．
+  {
+    "neovim/nvim-lspconfig",
+    ft = {
+      "lua",
+      "python",
+      "yaml",
+      "yaml.docker-compose",
+      "toml",
+      "fortran",
+    },
     dependencies = {
-      "mason-org/mason.nvim", -- 外部ツール管理．
-      "neovim/nvim-lspconfig", -- 各LSPサーバーの標準設定集．
       "hrsh7th/cmp-nvim-lsp", -- LSPの補完能力をnvim-cmpへ渡す．
     },
-    opts = {},
-    config = function(_, opts)
-      require("mason-lspconfig").setup(opts)
-      require("config.lsp")
-    end,
+    config = load_config("config.lsp"),
   },
 
   -- ==========================================================================
