@@ -7,10 +7,10 @@
 ------------------------------------------------------------
 local map = vim.keymap.set
 
--- 検索ハイライト解除（+ 画面再描画）
--- 以前は <Esc><Esc> だったが，ノーマルモードでの単発 <Esc> が
--- timeoutlen ぶん待たされるため <C-l> へ移動した．
-map("n", "<C-l>", "<cmd>nohlsearch<CR><C-l>", { silent = true, desc = "検索ハイライト解除" })
+-- 検索ハイライト解除（Esc 2 回）
+-- <Esc> 単体は押した時点で timeoutlen（300ms）ぶん後続キーを待つが，
+-- ノーマルモードの <Esc> 単体は元から「何もしない」ため実害はない．
+map("n", "<Esc><Esc>", "<Cmd>nohlsearch<CR>", { silent = true, desc = "検索ハイライト解除" })
 
 -- 挿入モードで jj でノーマルモード
 map("i", "jj", "<ESC>", { silent = true })
@@ -33,3 +33,7 @@ map("n", ":", ";")
 -- W で保存, Q で終了
 map("n", "W", ":w<CR>", { desc = "保存" })
 map("n", "Q", ":q<CR>", { desc = "終了" })
+
+-- 行頭・行末への移動を gh / gl に割り当てる
+vim.keymap.set("n", "gh", "^",  { desc = "Go to first non-blank character" })
+vim.keymap.set("n", "gl", "g_", { desc = "Go to last non-blank character" })

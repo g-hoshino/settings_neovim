@@ -295,6 +295,7 @@ return {
   -- Tree-sitterパーサーを管理し，構文解析に基づくハイライトを有効化する．
   {
     "nvim-treesitter/nvim-treesitter",
+    dependencies = { 'neovim-treesitter/treesitter-parser-registry' },
     branch = "main",
     lazy = false,
     build = ":TSUpdate",
@@ -584,6 +585,16 @@ return {
         end,
       },
     },
+  },
+
+  -- CLIベースのLLMエージェント（Claude Code / Codex CLI）を
+  -- フローティングターミナルで開く．自作プラグイン．
+  -- 開発用の作業ツリーは /home2/ginta/package/aicli.nvim にある．
+  {
+    "g-hoshino/aicli.nvim",
+    cmd = { "Aicli", "AicliToggle", "AicliStatus", "Claude", "Codex" },
+    keys = { "<leader>aa", "<leader>ac", "<leader>ax" },
+    opts = {},
   },
 
   -- ==========================================================================

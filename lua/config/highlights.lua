@@ -21,15 +21,8 @@ local function set_my_hl()
     vim.api.nvim_set_hl(0, group, { fg = comment_fg })
   end
 
-  vim.api.nvim_set_hl(0, "FloatBorder", {
-    fg = "#ff00ff",
-    bg = "none",
-  })
-
-  vim.api.nvim_set_hl(0, "ToggleTermBorder", {
-    fg = "#ff4dd0",
-    bold = true,
-  })
+  vim.api.nvim_set_hl(0, "AicliBorder", { link = "Normal" })
+  vim.api.nvim_set_hl(0, "AicliTitle", { link = "Normal" })
 end
 
 local function set_transparent_highlights()

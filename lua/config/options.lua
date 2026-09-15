@@ -62,29 +62,9 @@ opt.hlsearch = true
 opt.clipboard = "unnamedplus"
 opt.shada = "'20,\"1000"
 
--- OSC52 clipboard
--- copy は端末へ書き込むだけなので OSC52 を使う．
--- paste は OSC52 だと端末応答を vim.wait() で同期的に待ち，応答しない端末では
--- 貼り付けのたびに最大 1 秒ブロックするため，直前の yank レジスタを返す．
-do
-  local ok, osc52 = pcall(require, "vim.ui.clipboard.osc52")
-  if ok then
-    local function paste_from_unnamed()
-      return vim.split(vim.fn.getreg('"'), "\n")
-    end
-
-    vim.g.clipboard = {
-      name = "osc52",
-      copy = {
-        ["+"] = osc52.copy("+"),
-        ["*"] = osc52.copy("*"),
-      },
-      paste = {
-        ["+"] = paste_from_unnamed,
-        ["*"] = paste_from_unnamed,
-      },
-    }
-  end
+-- SSH先でもローカル端末のclipboardを使用
+if vim.env.SSH_TTY then
+  vim.g.clipboard = "osc52"
 end
 
 ------------------------------------------------------------
