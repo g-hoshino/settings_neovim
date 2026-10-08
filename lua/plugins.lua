@@ -325,6 +325,7 @@ return {
           "vimdoc",
           "python",
           "bash",
+          "sh",
           "json",
           "yaml",
           "markdown",
@@ -440,11 +441,6 @@ return {
     config = load_config("config.cmp"),
   },
 
-  -- cmp-cmdlineは cmp.setup.cmdline() を書いて初めて機能する．
-  -- 設定が無いまま CmdlineEnter で読み込むと，`:` や `/` を押すたびに
-  -- nvim-cmp 一式をロードするだけになるため外した．
-  -- 使う場合はここに spec を戻し，config/cmp.lua に cmp.setup.cmdline() を書く．
-
   -- GitHub Copilot Chatを縦分割ウィンドウで利用する．
   {
     "CopilotC-Nvim/CopilotChat.nvim",
@@ -527,6 +523,7 @@ return {
       "yaml.docker-compose",
       "toml",
       "fortran",
+      "bash",
     },
     dependencies = {
       "hrsh7th/cmp-nvim-lsp", -- LSPの補完能力をnvim-cmpへ渡す．
