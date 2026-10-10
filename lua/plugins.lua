@@ -604,9 +604,10 @@ return {
   {
     "lervag/vimtex",
     ft = { "tex", "plaintex", "bib" },
+    -- 設定値はfiletype plugin読み込み前に定義する必要があるためinitで行う．
+    -- ビューアはmacOSならSkim/Preview，それ以外はzathuraを自動選択する．
     init = function()
-      vim.g.vimtex_view_method = "zathura"
-      vim.g.vimtex_quickfix_mode = 0
+      require("config.vimtex").setup()
     end,
   },
 }
